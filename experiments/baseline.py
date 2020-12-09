@@ -3,12 +3,18 @@ from typing_model.data.parse_dataset import DatasetParser
 from typing_model.data.dataset import TypingBERTDataBase
 from torch.utils.data import DataLoader
 
-pt = DatasetParser("examples/toy_dataset.json")
-parsed = pt.parse_dataset()
+pt_train = DatasetParser("../data/g_dev_tree.json")
+parsed_train = pt_train.parse_dataset()
 
-dataset = TypingBERTDataBase(*parsed)
-dataloader = DataLoader(dataset)
+dataset_train = TypingBERTDataBase(*parsed_train)
+dataloader_train = DataLoader(dataset_train)
 
-bt = BaseBERTTyper()
+pt_test = DatasetParser("../data/g_dev_tree.json")
+parsed_test = pt_test.parse_dataset()
 
-bt(dataloader)
+dataset_test = TypingBERTDataBase(*parsed_test)
+dataloader_test = DataLoader(dataset_test)
+
+bt = BaseBERTTyper(89)
+
+bt.train_(dataloader_train, dataloader_test)

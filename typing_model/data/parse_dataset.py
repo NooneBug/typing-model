@@ -19,8 +19,8 @@ class DatasetParser:
 
         for l in lines:
             mentions.append((l['mention_span']))
-            left_context.append((" ".join(l['left_context_tokens'])))
-            right_context.append((" ".join(l['right_context_tokens'])))
+            left_context.append((" ".join(l['left_context_token'])))
+            right_context.append((" ".join(l['right_context_token'])))
             labels.append(l['y_str'])
 
         return mentions, left_context, right_context, labels

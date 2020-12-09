@@ -1,2 +1,2 @@
-{"left_context_tokens": ["I", "like"], "mention_span": "cats", "right_context_tokens": ["and", "other", "animals"], "y_str": ["animal"]}
-{"left_context_tokens": ["I", "want", "to", "live", "in"], "mention_span": "New York", "right_context_tokens": [], "y_str": ["location", "city"]}
+{"left_context_token": ["I", "like"], "mention_span": "cats", "right_context_token": ["and", "other", "animals"], "y_str": ["animal"]}
+{"left_context_token": ["I", "want", "to", "live", "in"], "mention_span": "New York", "right_context_token": [], "y_str": ["location", "city"]}

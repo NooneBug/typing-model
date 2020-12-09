@@ -1,5 +1,7 @@
 from torch.utils.data import Dataset
 from sentence_transformers import SentenceTransformer
+import gc
+import torch
 
 class TypingDataBase(Dataset):
 
@@ -20,10 +22,14 @@ class TypingBERTDataBase(TypingDataBase):
 
     def __init__(self, mention, left_side, right_side, label):
         super().__init__(mention, left_side, right_side, label)
-        model = SentenceTransformer('distilbert-base-nli-mean-tokens')
+        model = SentenceTransformer('bert-large-uncased')
 
-        self.mentions = model.encode(mention)
-        self.left_side = model.encode(left_side)
-        self.right_side = model.encode(right_side)
+        self.mentions = model.encode(mention, show_progress_bar=True, batch_size=100)
+        self.left_side = model.encode(left_side, show_progress_bar=True, batch_size=100)
+        self.right_side = model.encode(right_side, show_progress_bar=True, batch_size=100)
         self.labels = label
+        del model
+        torch.cuda.empty_cache()
+        gc.collect()
+
 
