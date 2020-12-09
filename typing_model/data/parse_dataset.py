@@ -1,6 +1,6 @@
 import json
 
-class datasetParser():
+class DatasetParser:
 
     def __init__(self, dataset_path):
         self.dataset_path = dataset_path
@@ -9,7 +9,7 @@ class datasetParser():
         mentions = []
         left_context = []
         right_context = []
-        labels = [] 
+        labels = []
 
         if not dataset_path:
             dataset_path = self.dataset_path
@@ -18,9 +18,9 @@ class datasetParser():
             lines = [json.loads(l) for l in inp.readlines()]
 
         for l in lines:
-            mentions.append(l['mention_span'].split(' '))
-            left_context.append(l['left_context_tokens'])
-            right_context.append(l['right_context_tokens'])
+            mentions.append((l['mention_span']))
+            left_context.append((" ".join(l['left_context_tokens'])))
+            right_context.append((" ".join(l['right_context_tokens'])))
             labels.append(l['y_str'])
 
         return mentions, left_context, right_context, labels
