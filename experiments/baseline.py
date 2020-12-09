@@ -5,12 +5,10 @@ from torch.utils.data import DataLoader
 
 pt_train = DatasetParser("../data/g_dev_tree.json")
 parsed_train = pt_train.parse_dataset()
+parsed_test = pt_test.parse_dataset("../data/g_dev_tree.json")
 
 dataset_train = TypingBERTDataSet(*parsed_train)
 dataloader_train = DataLoader(dataset_train)
-
-pt_test = DatasetParser("../data/g_dev_tree.json")
-parsed_test = pt_test.parse_dataset()
 
 dataset_test = TypingBERTDataSet(*parsed_test)
 dataloader_test = DataLoader(dataset_test)

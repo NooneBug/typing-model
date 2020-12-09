@@ -28,14 +28,14 @@ class TypingDataSet(Dataset):
 
 class TypingBERTDataSet(TypingDataSet):
 
-    def __init__(self, mention, left_side, right_side, label):
-        super().__init__(mention, left_side, right_side, label)
+    def __init__(self, mention, left_side, right_side, label, id2label, label2id, vocab_size):
+        super().__init__(mention, left_side, right_side, label. id2label, label2id, vocab_size)
         model = SentenceTransformer('bert-large-uncased')
 
         self.mentions = model.encode(mention, show_progress_bar=True, batch_size=100)
         self.left_side = model.encode(left_side, show_progress_bar=True, batch_size=100)
         self.right_side = model.encode(right_side, show_progress_bar=True, batch_size=100)
-
+        
         del model
         torch.cuda.empty_cache()
         gc.collect()
