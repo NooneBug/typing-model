@@ -1,5 +1,4 @@
 import json
-from collections import defaultdict
 
 class DatasetParser:
 
@@ -46,6 +45,5 @@ class DatasetParser:
             left_context.append((" ".join(l['left_context_token'])))
             right_context.append((" ".join(l['right_context_token'])))
             labels.append(l['y_str'])
-
 
         return mentions, left_context, right_context, labels

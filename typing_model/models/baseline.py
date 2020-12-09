@@ -4,7 +4,6 @@ from tqdm import tqdm
 
 
 class BaseBERTTyper(nn.Module):
-
     def __init__(self, classes):
         super().__init__()
 
@@ -43,7 +42,6 @@ class BaseBERTTyper(nn.Module):
         e = 0
         while e < self.epochs and not self.early_stopping_trigger:
             pbar = tqdm(total=len(train_loader), desc='{}^ epoch: training'.format(e + 1))
-            # TODO: rename data and split in 4 variables
             for mention_x, left_x, right_x, labels in train_loader:
                 self.optimizer.zero_grad()
                 self.train()
@@ -67,15 +65,14 @@ class BaseBERTTyper(nn.Module):
 
                 pbar = tqdm(total=len(val_loader), desc='{}^ epoch: validation'.format(e + 1))
                 # TODO: rename data and split in 4 variables
-                for data in val_loader:
+                for mention_x, left_x, right_x, labels in val_loader:
 
-                    model_output = self(data[0], data[1], data[2])
+                    model_output = self(mention_x, left_x, right_x)
 
-                    labels = data[3]
                     val_loss = self.compute_loss(model_output, labels)
 
                     val_loss_SUM += val_loss
-                    total_val_examples += len(data)
+                    total_val_examples += len(mention_x)
                     pbar.update(1)
 
                 pbar.close()
