@@ -15,4 +15,4 @@ class TestTyping_model(unittest.TestCase):
         parsed = pt.parse_dataset()
         assert len(parsed[0]) == 2
 
-        TypingBERTDataBase(*parsed)
+        TypingBERTDataSet(*parsed)
