@@ -16,6 +16,7 @@ class BaseBERTTyper(nn.Module):
 
         self.classification_loss = nn.BCEWithLogitsLoss()
         self.epochs = 5
+        self.optimizer = torch.optim.Adam(self.parameters())
 
         self.early_stopping = True
         self.patience = 3
@@ -43,22 +44,18 @@ class BaseBERTTyper(nn.Module):
         while e < self.epochs and not self.early_stopping_trigger:
             pbar = tqdm(total=len(train_loader), desc='{}^ epoch: training'.format(e + 1))
             # TODO: rename data and split in 4 variables
-            for data in train_loader:
+            for mention_x, left_x, right_x, labels in train_loader:
                 self.optimizer.zero_grad()
                 self.train()
 
-                model_output = self(data[0], data[1], data[2])
-
-                # print('model_output: {}'.format(model_output))
-
-                labels = data[3]
+                model_output = self(mention_x, left_x, right_x)
 
                 loss = self.compute_loss(model_output, labels)
 
                 loss.backward()
 
                 loss_SUM += loss.item()
-                total_examples += len(data)
+                total_examples += len(mention_x)
 
                 pbar.update(1)
 
@@ -102,11 +99,11 @@ class BaseBERTTyper(nn.Module):
                 print('EarlyStopping')
                 self.early_stopping_trigger = True
         print('\t best epoch: {}\n'.format(self.best_epoch))
-    
+
     def save_model(self, epoch):
-        # TO DO: update the path where save the model  
+        # TO DO: update the path where save the model
         torch.save({
                 'model_state_dict' : self.state_dict(),
-                'epoch' : epoch 
-              }, 
-              '/model.pth')
+                'epoch' : epoch
+              },
+              './model.pth')
