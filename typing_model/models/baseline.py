@@ -15,6 +15,11 @@ class BaseBERTTyper(nn.Module):
         self.hidden_to_output = nn.Linear(600, classes)
 
         self.classification_loss = nn.BCEWithLogitsLoss()
+        self.epochs = 5
+
+        self.early_stopping = True
+        self.patience = 3
+        self.early_stopping_trigger = False
 
     def forward(self, mention, left, right):
 
@@ -97,3 +102,11 @@ class BaseBERTTyper(nn.Module):
                 print('EarlyStopping')
                 self.early_stopping_trigger = True
         print('\t best epoch: {}\n'.format(self.best_epoch))
+    
+    def save_model(self, epoch):
+        # TO DO: update the path where save the model  
+        torch.save({
+                'model_state_dict' : self.state_dict(),
+                'epoch' : epoch 
+              }, 
+              '/model.pth')
