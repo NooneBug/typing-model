@@ -14,7 +14,7 @@ class BaseBERTTyper(nn.Module):
 
         self.hidden_to_output = nn.Linear(600, classes)
 
-        self.classification_loss = nn.BCEWithLogitLoss()
+        self.classification_loss = nn.BCEWithLogitsLoss()
 
     def forward(self, mention, left, right):
 
