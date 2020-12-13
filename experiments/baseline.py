@@ -25,16 +25,15 @@ def get_dataloader_from_dataset_path(dataset_path, batch_size = 500, train = Fal
     else:
         return dataloader, id2label, label2id, vocab_len
 
-trainset_path = "/datahdd/vmanuel/entity_typing_all_datasets/data/ontonotes/g_train_tree.json"
-valset_path = "/datahdd/vmanuel/entity_typing_all_datasets/data/ontonotes/g_dev_tree.json"
-testset_path = "../../data/test_1k.json"
+trainset_path = "../data/test_data.json"
+valset_path = "../data/test_data.json"
+
 
 dataloader_train, id2label, label2id, vocab_len = get_dataloader_from_dataset_path(trainset_path, train = True)
-
-dataloader_val = get_dataloader_from_dataset_path(valset_path,id2label=id2label, label2id=label2id, vocab_len=vocab_len)
+dataloader_val = get_dataloader_from_dataset_path(valset_path, id2label=id2label, label2id=label2id, vocab_len=vocab_len)
 
 early_stop_callback = EarlyStopping(
-   monitor='val_accuracy',
+   monitor='val_loss',
    min_delta=0.00,
    patience=3,
    verbose=False,
@@ -42,14 +41,5 @@ early_stop_callback = EarlyStopping(
 )
 
 trainer = Trainer(callbacks=[early_stop_callback])
-
-
 bt = BaseBERTTyper(vocab_len, id2label, label2id)
-
-
-trainer.fit(bt, dataloader_val, dataloader_val)
-
-# dataloader_test = get_dataloader_from_dataset_path(testset_path,
-                                                    # id2label=id2label, label2id=label2id, vocab_len=vocab_len)
-
-# bt.evaluate_(dataloader_test)
+trainer.fit(bt, dataloader_train, dataloader_val)
