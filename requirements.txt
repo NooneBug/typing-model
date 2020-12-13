@@ -1,3 +1,4 @@
 torch==1.6.0
 sentence-transformers==0.3.6
 tqdm
+pytorch-lightning

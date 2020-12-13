@@ -1,5 +1,9 @@
 .idea/
 .data/
+trained_models/
+experiments/logs/
+*.pth
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

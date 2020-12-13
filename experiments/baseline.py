@@ -1,25 +1,40 @@
-from typing_model.models.baseline import *
+from typing_model.models.baseline import BaseBERTTyper
 from typing_model.data.parse_dataset import DatasetParser
 from typing_model.data.dataset import TypingBERTDataSet
 from torch.utils.data import DataLoader
 
-pt_train = DatasetParser("../data/test_data.json")
-id2label, label2id, vocab_len = pt_train.collect_global_config()
-mention_train, left_side_train, right_side_train, label_train = pt_train.parse_dataset()
+def get_dataloader_from_dataset_path(dataset_path, batch_size = 500, train = False, id2label = None, label2id = None, vocab_len = None):
+    pt = DatasetParser(dataset_path)
 
-pt_test = DatasetParser("../data/test_data.json")
-mention_test, left_side_test, right_side_test, label_test = pt_test.parse_dataset()
+    if train:
+        id2label, label2id, vocab_len = pt.collect_global_config()
+    elif not id2label or not label2id or not vocab_len:
+        raise Exception('Please provide id2label_dict, label2id_dict and vocab len to generate val_loader or test_loader')
+    
+    mention, left_side, right_side, label = pt.parse_dataset()
 
-dataset_train = TypingBERTDataSet(mention_train, left_side_train, right_side_train, label_train,
-                                  id2label, label2id, vocab_len)
+    dataset = TypingBERTDataSet(mention, left_side, right_side, label, id2label, label2id, vocab_len)
 
-dataloader_train = DataLoader(dataset_train)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle = True)
 
-dataset_test = TypingBERTDataSet(mention_test, left_side_test, right_side_test, label_test, id2label,
-                                 label2id, vocab_len)
+    if not train:
+        return dataloader
+    else:
+        return dataloader, id2label, label2id, vocab_len
 
-dataloader_test = DataLoader(dataset_test)
+trainset_path = "/datahdd/vmanuel/entity_typing_all_datasets/data/ontonotes/g_train_tree.json"
+valset_path = "/datahdd/vmanuel/entity_typing_all_datasets/data/ontonotes/g_dev_tree.json"
+testset_path = "../../data/test_1k.json"
 
-bt = BaseBERTTyper(vocab_len)
+dataloader_train, id2label, label2id, vocab_len = get_dataloader_from_dataset_path(trainset_path, train = True)
 
-bt.train_(dataloader_train, dataloader_test)
+dataloader_val = get_dataloader_from_dataset_path(valset_path,id2label=id2label, label2id=label2id, vocab_len=vocab_len)
+
+bt = BaseBERTTyper(vocab_len, id2label, label2id)
+
+bt.train_(dataloader_train, dataloader_val)
+
+# dataloader_test = get_dataloader_from_dataset_path(testset_path, 
+                                                    # id2label=id2label, label2id=label2id, vocab_len=vocab_len)
+
+# bt.evaluate_(dataloader_test)
