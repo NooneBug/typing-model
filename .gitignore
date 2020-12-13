@@ -3,6 +3,7 @@
 trained_models/
 experiments/logs/
 *.pth
+lightning_logs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
