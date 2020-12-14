@@ -38,7 +38,6 @@ dataloader_val = get_dataloader_from_dataset_path(valset_path,
 
 bt = BaseBERTTyper(vocab_len, id2label, label2id)
 
-
 trainer = pl.Trainer()
 
 trainer.fit(bt, dataloader_train, dataloader_val)
