@@ -2,8 +2,14 @@ from typing_model.models.baseline import BaseBERTTyper
 from typing_model.data.parse_dataset import DatasetParser
 from typing_model.data.dataset import TypingBERTDataSet
 from torch.utils.data import DataLoader
+
 import pytorch_lightning as pl
+from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+
 
 def get_dataloader_from_dataset_path(dataset_path, batch_size = 500, shuffle = False, train = False, id2label = None, label2id = None, vocab_len = None):
     pt = DatasetParser(dataset_path)
@@ -38,6 +44,14 @@ dataloader_val = get_dataloader_from_dataset_path(valset_path,
 
 bt = BaseBERTTyper(vocab_len, id2label, label2id)
 
-trainer = pl.Trainer()
+early_stop_callback = EarlyStopping(
+   monitor='val_loss',
+   min_delta=0.00,
+   patience=10,
+   verbose=False,
+   mode='min'
+)
+
+trainer = Trainer(callbacks=[early_stop_callback])
 
 trainer.fit(bt, dataloader_train, dataloader_val)
