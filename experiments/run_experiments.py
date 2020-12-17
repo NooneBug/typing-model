@@ -2,7 +2,7 @@ from typing_model.runner.experimenters import ExperimentRoutine, BertBaselineExp
 from typing_model.data_models.base_dataclass import BertBaselineDataclass
 
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+# os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 config_file_path = 'experiments/exp_config.ini'
 

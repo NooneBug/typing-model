@@ -8,6 +8,9 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 import configparser
 
+# from pytorch_lightning.loggers import TensorBoardLogger
+
+
 
 class ExperimentRoutine():
     def __init__(self, exp_list, config_file):
@@ -51,10 +54,12 @@ class BertBaselineExperiment(BaseExperimentClass):
         self.dataloader_train, id2label, label2id, vocab_len = self.get_dataloader_from_dataset_path(self.train_data_path, 
                                                                                                 shuffle=True, train = True)
 
-        self.dataloader_val = self.get_dataloader_from_dataset_path(self.eval_data_path,
+        self.dataloader_val = self.get_dataloader_from_dataset_path(self.eval_data_path, batch_size=5,
                                                                 id2label=id2label, label2id=label2id, vocab_len=vocab_len)
 
         self.bt = BaseBERTTyper(vocab_len, id2label, label2id)
+
+        # logger = TensorBoardLogger('tb_logs', name='my_model')
 
         if self.early_stopping:
             early_stop_callback = EarlyStopping(
@@ -67,7 +72,7 @@ class BertBaselineExperiment(BaseExperimentClass):
 
             self.trainer = Trainer(callbacks=[early_stop_callback])
         else:
-            self.trainer = Trainer(callbacks=[early_stop_callback])
+            self.trainer = Trainer()
 
     def perform_experiment(self):
         self.trainer.fit(self.bt, self.dataloader_train, self.dataloader_val)
