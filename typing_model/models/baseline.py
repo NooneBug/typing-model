@@ -23,25 +23,21 @@ class BaseBERTTyper(pl.LightningModule):
 
 
         # Declare Metrics
-        # self.micro_precision = pl.metrics.classification.precision_recall.Precision(num_classes=len(self.id2label),
-        self.micro_precision = Precision(num_classes=len(self.id2label),
+        self.micro_precision = pl.metrics.classification.precision_recall.Precision(num_classes=len(self.id2label),
                                                                                     average='micro', 
                                                                                     multilabel=True)
-        # self.micro_recall = pl.metrics.classification.precision_recall.Recall(num_classes=len(self.id2label),
-        self.micro_recall = Recall(num_classes=len(self.id2label),
+        self.micro_recall = pl.metrics.classification.precision_recall.Recall(num_classes=len(self.id2label),
                                                                                 average='micro', 
                                                                                 multilabel=True)
         self.micro_f1 = pl.metrics.classification.F1(num_classes=len(self.id2label),
                                                         average='micro', 
                                                         multilabel=True)
 
-        # self.macro_precision = pl.metrics.classification.precision_recall.Precision(num_classes=len(self.id2label),
-        self.macro_precision = Precision(num_classes=len(self.id2label),
+        self.macro_precision = pl.metrics.classification.precision_recall.Precision(num_classes=len(self.id2label),
                                                                                     average='macro', 
                                                                                     multilabel=True)
         
-        # self.macro_recall = pl.metrics.classification.precision_recall.Recall(num_classes=len(self.id2label),
-        self.macro_recall = Recall(num_classes=len(self.id2label),
+        self.macro_recall = pl.metrics.classification.precision_recall.Recall(num_classes=len(self.id2label),
                                                                                     average='macro', 
                                                                                     multilabel=True)
 
