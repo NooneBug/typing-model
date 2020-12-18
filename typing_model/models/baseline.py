@@ -57,6 +57,8 @@ class BaseBERTTyper(pl.LightningModule):
 
         loss = self.compute_loss(model_output, labels)
 
+        self.log('train_loss', loss, on_epoch=True, on_step=False)
+
         return loss
 
     def validation_step(self, batch, batch_step):
@@ -67,7 +69,7 @@ class BaseBERTTyper(pl.LightningModule):
         val_loss = self.compute_loss(model_output, labels)
         
         # TO DO: log the total val loss, not at each validation step
-        self.log('val_loss', val_loss)
+        self.log('val_loss', val_loss, on_epoch=True, on_step=False)
         
         self.update_metrics(pred=model_output, labels=labels)
 
@@ -117,8 +119,11 @@ class BaseBERTTyper(pl.LightningModule):
         self.log('macro/macro_p', self.macro_precision.compute())
         self.log('macro/macro_r', self.macro_recall.compute())
 
-        _, _, _, _, _, ma_p, ma_r, ma_f1 = self.my_metrics.compute()
+        avg_pred_number, void_predictions, _, _, _, ma_p, ma_r, ma_f1 = self.my_metrics.compute()
 
         self.log('example_macro/macro_f1', ma_f1)
         self.log('example_macro/macro_p', ma_p)
         self.log('example_macro/macro_r', ma_r)
+
+        self.log('other_metrics/avg_pred_number', avg_pred_number)
+        self.log('other_metrics/void_predictions', void_predictions)

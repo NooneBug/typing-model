@@ -66,6 +66,8 @@ class BertBaselineExperiment(BaseExperimentClass):
         self.checkpoint_folder_path = dataclass.checkpoint_folder_path
         self.checkpoint_name = dataclass.checkpoint_name
         self.checkpoint_mode = dataclass.checkpoint_mode
+        self.save_auxiliary_variables = dataclass.save_auxiliary_variables
+        self.aux_save_path = dataclass.aux_save_path
 
     def setup(self):
         self.dataloader_train, id2label, label2id, vocab_len = self.get_dataloader_from_dataset_path(self.train_data_path, 
@@ -77,6 +79,12 @@ class BertBaselineExperiment(BaseExperimentClass):
                                                                 id2label=id2label, label2id=label2id, vocab_len=vocab_len,
                                                                 load_path=self.load_eval_dataset_path,
                                                                 save_path=self.save_eval_dataset_path)
+
+        if self.save_auxiliary_variables:
+            with open(self.aux_save_path, "wb") as filino:
+                pickle.dump((id2label, label2id, vocab_len), filino)
+
+
 
         self.bt = BaseBERTTyper(vocab_len, id2label, label2id)
 
@@ -112,22 +120,21 @@ class BertBaselineExperiment(BaseExperimentClass):
             id2label, label2id, vocab_len = pt.collect_global_config()
         elif not id2label or not label2id or not vocab_len:
             raise Exception('Please provide id2label_dict, label2id_dict and vocab len to generate val_loader or test_loader')
-        
-        #Create Dataset or load it
+
+        #Create Dataloader or load it
         if not load_path:
             mention, left_side, right_side, label = pt.parse_dataset()
 
             dataset = TypingBERTDataSet(mention, left_side, right_side, label, id2label, label2id, vocab_len)
+            dataloader = DataLoader(dataset, batch_size=batch_size, shuffle = shuffle, num_workers=10)
         else:
             with open(load_path, "rb") as filino:
-                dataset = pickle.load(filino)
+                dataloader = pickle.load(filino)
 
-        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle = shuffle, num_workers=10)
-        
-        # save dataset for future training
+        # save dataloader for future training
         if save_path:
             with open(save_path, "wb") as filino:
-                pickle.dump(dataset, filino)
+                pickle.dump(dataloader, filino)
 
         if not train:
             return dataloader

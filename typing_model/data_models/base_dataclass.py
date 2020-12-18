@@ -33,10 +33,14 @@ class BertBaselineDataclass(BaseDataclass):
     load_eval_dataset_path : str = None
     load_test_dataset_path : str = None
 
+    save_auxiliary_variables : str = False
+    aux_save_path : str = None
+
     def __post_init__(self):
         self.early_stopping = bool(self.early_stopping)
         self.early_stopping_patience = int(self.early_stopping_patience)
         self.epochs = int(self.epochs)
+        self.save_auxiliary_variables = bool(self.save_auxiliary_variables)
 
     # early_stopping = bool(early_stopping)
     # early_stopping_patience = int(early_stopping_patience)
