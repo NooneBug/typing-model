@@ -1,9 +1,7 @@
 import torch
-import numpy as np
 from torch import nn
 import pytorch_lightning as pl
-from typing_model.metrics.my_metrics import MyMetrics, Precision, Recall
-
+from typing_model.metrics.my_metrics import MyMetrics
 
 class BaseBERTTyper(pl.LightningModule):
     def __init__(self, classes, id2label, label2id, name = 'BertTyper'):
@@ -119,7 +117,7 @@ class BaseBERTTyper(pl.LightningModule):
         self.log('macro/macro_p', self.macro_precision.compute())
         self.log('macro/macro_r', self.macro_recall.compute())
 
-        avg_pred_number, void_predictions, _, _, _, ma_p, ma_r, ma_f1 = self.my_metrics.compute()
+        _, _, _, _, _, ma_p, ma_r, ma_f1 = self.my_metrics.compute()
 
         self.log('example_macro/macro_f1', ma_f1)
         self.log('example_macro/macro_p', ma_p)

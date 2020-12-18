@@ -15,9 +15,18 @@ class BertBaselineDataclass(BaseDataclass):
     train_data_path : str 
     eval_data_path : str 
     test_data_path : str 
+    
     early_stopping : bool
     early_stopping_patience : int
     epochs : int
+    
+    save_train_dataset_path : str = None
+    save_eval_dataset_path : str = None
+    save_test_dataset_path : str = None
+    
+    load_train_dataset_path : str = None
+    load_eval_dataset_path : str = None
+    load_test_dataset_path : str = None
 
     def __post_init__(self):
         self.early_stopping = bool(self.early_stopping)

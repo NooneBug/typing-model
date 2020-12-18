@@ -1,3 +1,5 @@
+from build.lib.typing_model import data
+from pytorch_lightning.utilities.cloud_io import load
 from typing_model.data.parse_dataset import DatasetParser
 from typing_model.data.dataset import TypingBERTDataSet
 from torch.utils.data import DataLoader
@@ -6,8 +8,9 @@ from typing_model.models.baseline import BaseBERTTyper
 import pytorch_lightning as pl
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
-import configparser
 
+import configparser
+import pickle
 # from pytorch_lightning.loggers import TensorBoardLogger
 
 
@@ -49,13 +52,24 @@ class BertBaselineExperiment(BaseExperimentClass):
         self.early_stopping_patience = dataclass.early_stopping_patience
         self.epochs = dataclass.epochs
 
+        self.load_train_dataset_path = dataclass.load_train_dataset_path
+        self.load_eval_dataset_path = dataclass.load_eval_dataset_path
+        self.load_test_dataset_path = dataclass.load_test_dataset_path
+        
+        self.save_train_dataset_path = dataclass.save_train_dataset_path
+        self.save_eval_dataset_path = dataclass.save_eval_dataset_path
+        self.save_test_dataset_path = dataclass.save_test_dataset_path
 
     def setup(self):
         self.dataloader_train, id2label, label2id, vocab_len = self.get_dataloader_from_dataset_path(self.train_data_path, 
-                                                                                                shuffle=True, train = True)
+                                                                                                shuffle=True, train = True,
+                                                                                                load_path=self.load_train_dataset_path,
+                                                                                                save_path=self.save_train_dataset_path)
 
-        self.dataloader_val = self.get_dataloader_from_dataset_path(self.eval_data_path, batch_size=5,
-                                                                id2label=id2label, label2id=label2id, vocab_len=vocab_len)
+        self.dataloader_val = self.get_dataloader_from_dataset_path(self.eval_data_path,
+                                                                id2label=id2label, label2id=label2id, vocab_len=vocab_len,
+                                                                load_path=self.load_eval_dataset_path,
+                                                                save_path=self.save_eval_dataset_path)
 
         self.bt = BaseBERTTyper(vocab_len, id2label, label2id)
 
@@ -77,7 +91,9 @@ class BertBaselineExperiment(BaseExperimentClass):
     def perform_experiment(self):
         self.trainer.fit(self.bt, self.dataloader_train, self.dataloader_val)
 
-    def get_dataloader_from_dataset_path(self, dataset_path, batch_size = 500, shuffle = False, train = False, id2label = None, label2id = None, vocab_len = None):
+    def get_dataloader_from_dataset_path(self, dataset_path, batch_size = 500, shuffle = False, train = False, load_path = None,
+                                                save_path = None, id2label = None, label2id = None, vocab_len = None):
+        
         pt = DatasetParser(dataset_path)
 
         if train:
@@ -85,11 +101,21 @@ class BertBaselineExperiment(BaseExperimentClass):
         elif not id2label or not label2id or not vocab_len:
             raise Exception('Please provide id2label_dict, label2id_dict and vocab len to generate val_loader or test_loader')
         
-        mention, left_side, right_side, label = pt.parse_dataset()
+        #Create Dataset or load it
+        if not load_path:
+            mention, left_side, right_side, label = pt.parse_dataset()
 
-        dataset = TypingBERTDataSet(mention, left_side, right_side, label, id2label, label2id, vocab_len)
+            dataset = TypingBERTDataSet(mention, left_side, right_side, label, id2label, label2id, vocab_len)
+        else:
+            with open(load_path, "rb") as filino:
+                dataset = pickle.load(filino)
 
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle = shuffle, num_workers=10)
+        
+        # save dataset for future training
+        if save_path:
+            with open(save_path, "wb") as filino:
+                pickle.dump(dataset, filino)
 
         if not train:
             return dataloader
