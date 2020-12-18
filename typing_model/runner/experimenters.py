@@ -4,6 +4,8 @@ from typing_model.data.parse_dataset import DatasetParser
 from typing_model.data.dataset import TypingBERTDataSet
 from torch.utils.data import DataLoader
 from typing_model.models.baseline import BaseBERTTyper
+from pytorch_lightning.callbacks import ModelCheckpoint
+
 
 import pytorch_lightning as pl
 from pytorch_lightning import Trainer
@@ -60,6 +62,11 @@ class BertBaselineExperiment(BaseExperimentClass):
         self.save_eval_dataset_path = dataclass.save_eval_dataset_path
         self.save_test_dataset_path = dataclass.save_test_dataset_path
 
+        self.checkpoint_monitor = dataclass.checkpoint_monitor
+        self.checkpoint_folder_path = dataclass.checkpoint_folder_path
+        self.checkpoint_name = dataclass.checkpoint_name
+        self.checkpoint_mode = dataclass.checkpoint_mode
+
     def setup(self):
         self.dataloader_train, id2label, label2id, vocab_len = self.get_dataloader_from_dataset_path(self.train_data_path, 
                                                                                                 shuffle=True, train = True,
@@ -73,7 +80,8 @@ class BertBaselineExperiment(BaseExperimentClass):
 
         self.bt = BaseBERTTyper(vocab_len, id2label, label2id)
 
-        # logger = TensorBoardLogger('tb_logs', name='my_model')
+        # declare callbacks
+        callbacks = []
 
         if self.early_stopping:
             early_stop_callback = EarlyStopping(
@@ -83,10 +91,14 @@ class BertBaselineExperiment(BaseExperimentClass):
             verbose=False,
             mode='min'
             )
-
-            self.trainer = Trainer(callbacks=[early_stop_callback])
-        else:
-            self.trainer = Trainer()
+            callbacks.append(early_stop_callback)
+        
+        checkpoint_callback = ModelCheckpoint(monitor=self.checkpoint_monitor,
+                                                dirpath=self.checkpoint_folder_path,
+                                                filename=self.checkpoint_name,
+                                                mode=self.checkpoint_mode)
+        callbacks.append(checkpoint_callback)
+        self.trainer = Trainer(callbacks=callbacks)
 
     def perform_experiment(self):
         self.trainer.fit(self.bt, self.dataloader_train, self.dataloader_val)

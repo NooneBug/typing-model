@@ -19,6 +19,11 @@ class BertBaselineDataclass(BaseDataclass):
     early_stopping : bool
     early_stopping_patience : int
     epochs : int
+
+    checkpoint_monitor : str
+    checkpoint_folder_path : str
+    checkpoint_name : str
+    checkpoint_mode : str
     
     save_train_dataset_path : str = None
     save_eval_dataset_path : str = None
