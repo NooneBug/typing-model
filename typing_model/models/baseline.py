@@ -4,12 +4,11 @@ import pytorch_lightning as pl
 from typing_model.metrics.my_metrics import MyMetrics
 
 class BaseBERTTyper(pl.LightningModule):
-    def __init__(self, classes, id2label, label2id, name = 'BertTyper'):
+    def __init__(self, classes, id2label, label2id, name = 'BertTyper', weights = None):
         super().__init__()
 
         self.id2label = id2label
         self.label2id = label2id
-        self.classification_loss = nn.BCEWithLogitsLoss()
 
         self.mention_to_hidden = nn.Linear(1024, 200)
         self.left_to_hidden = nn.Linear(1024, 200)
@@ -18,6 +17,9 @@ class BaseBERTTyper(pl.LightningModule):
         self.hidden_to_output = nn.Linear(600, classes)
 
         self.sig = nn.Sigmoid()
+
+        self.weights = weights
+        self.classification_loss = nn.BCEWithLogitsLoss(pos_weight=self.weights)
 
 
         # Declare Metrics

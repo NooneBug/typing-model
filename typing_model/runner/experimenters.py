@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 from typing_model.models.baseline import BaseBERTTyper
 from pytorch_lightning.callbacks import ModelCheckpoint
 
+import torch
 
 import pytorch_lightning as pl
 from pytorch_lightning import Trainer
@@ -52,6 +53,8 @@ class BertBaselineExperiment(BaseExperimentClass):
         
         self.early_stopping = dataclass.early_stopping
         self.early_stopping_patience = dataclass.early_stopping_patience
+        self.early_stopping_metric = dataclass.early_stopping_metric
+        self.early_stopping_mode = dataclass.early_stopping_mode
         self.epochs = dataclass.epochs
 
         self.load_train_dataset_path = dataclass.load_train_dataset_path
@@ -69,6 +72,9 @@ class BertBaselineExperiment(BaseExperimentClass):
         self.save_auxiliary_variables = dataclass.save_auxiliary_variables
         self.aux_save_path = dataclass.aux_save_path
 
+        self.weighted = dataclass.weighted
+        self.weights_path = dataclass.weights_path
+
     def setup(self):
         self.dataloader_train, id2label, label2id, vocab_len = self.get_dataloader_from_dataset_path(self.train_data_path, 
                                                                                                 shuffle=True, train = True,
@@ -85,19 +91,24 @@ class BertBaselineExperiment(BaseExperimentClass):
                 pickle.dump((id2label, label2id, vocab_len), filino)
 
 
-
-        self.bt = BaseBERTTyper(vocab_len, id2label, label2id)
+        if self.weighted:
+            with open(self.weights_path, 'rb') as inp:
+                weights = pickle.load(inp) 
+            ordered_weights = torch.tensor([weights[id2label[i]] for i in range(len(id2label))])
+            self.bt = BaseBERTTyper(vocab_len, id2label, label2id, weights=ordered_weights)
+        else:
+            self.bt = BaseBERTTyper(vocab_len, id2label, label2id)
 
         # declare callbacks
         callbacks = []
 
         if self.early_stopping:
             early_stop_callback = EarlyStopping(
-            monitor='val_loss',
+            monitor=self.early_stopping_metric,
             min_delta=0.00,
             patience=self.early_stopping_patience,
             verbose=False,
-            mode='min'
+            mode=self.early_stopping_mode
             )
             callbacks.append(early_stop_callback)
         
