@@ -1,9 +1,9 @@
 from build.lib.typing_model import data
 from pytorch_lightning.utilities.cloud_io import load
 from typing_model.data.parse_dataset import DatasetParser
-from typing_model.data.dataset import TypingBERTDataSet
+from typing_model.data.dataset import TypingBERTDataSet, PaddedTypingBERTDataSet, SimplerTypingBERTDataSet
 from torch.utils.data import DataLoader
-from typing_model.models.baseline import BaseBERTTyper
+from typing_model.models.baseline import BaseBERTTyper, TransformerBERTTyper, TransformerWHierarchicalLoss, SimplerTransformerBERTTyper, TransformerWHierarchicalRegularization
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 import torch
@@ -44,7 +44,7 @@ class BaseExperimentClass():
         raise NotImplementedError
 
 
-class BertBaselineExperiment(BaseExperimentClass):
+class BaseTypingExperimentClass(BaseExperimentClass):
 
     def __init__(self, dataclass):
         self.train_data_path = dataclass.train_data_path
@@ -71,6 +71,7 @@ class BertBaselineExperiment(BaseExperimentClass):
         self.checkpoint_mode = dataclass.checkpoint_mode
         self.save_auxiliary_variables = dataclass.save_auxiliary_variables
         self.aux_save_path = dataclass.aux_save_path
+        self.auxiliary_variables_path = dataclass.auxiliary_variables_path
 
         self.weighted = dataclass.weighted
         self.weights_path = dataclass.weights_path
@@ -95,10 +96,13 @@ class BertBaselineExperiment(BaseExperimentClass):
             with open(self.weights_path, 'rb') as inp:
                 weights = pickle.load(inp) 
             ordered_weights = torch.tensor([weights[id2label[i]] for i in range(len(id2label))])
-            self.bt = BaseBERTTyper(vocab_len, id2label, label2id, weights=ordered_weights)
+            self.bt = self.network_class(vocab_len, id2label, label2id, weights=ordered_weights).cuda()
         else:
-            self.bt = BaseBERTTyper(vocab_len, id2label, label2id)
+            self.bt = self.network_class(vocab_len, id2label, label2id).cuda()
 
+        self.declare_trainer_and_callbacks()
+
+    def declare_trainer_and_callbacks(self):
         # declare callbacks
         callbacks = []
 
@@ -127,8 +131,11 @@ class BertBaselineExperiment(BaseExperimentClass):
         
         pt = DatasetParser(dataset_path)
 
-        if train:
+        if train and not load_path:
             id2label, label2id, vocab_len = pt.collect_global_config()
+        elif load_path:
+            with open(self.auxiliary_variables_path, 'rb') as filino:
+                id2label, label2id, vocab_len = pickle.load(filino)
         elif not id2label or not label2id or not vocab_len:
             raise Exception('Please provide id2label_dict, label2id_dict and vocab len to generate val_loader or test_loader')
 
@@ -136,11 +143,12 @@ class BertBaselineExperiment(BaseExperimentClass):
         if not load_path:
             mention, left_side, right_side, label = pt.parse_dataset()
 
-            dataset = TypingBERTDataSet(mention, left_side, right_side, label, id2label, label2id, vocab_len)
+            dataset = self.dataset_class(mention, left_side, right_side, label, id2label, label2id, vocab_len)
             dataloader = DataLoader(dataset, batch_size=batch_size, shuffle = shuffle, num_workers=10)
         else:
             with open(load_path, "rb") as filino:
                 dataloader = pickle.load(filino)
+            
 
         # save dataloader for future training
         if save_path:
@@ -151,3 +159,72 @@ class BertBaselineExperiment(BaseExperimentClass):
             return dataloader
         else:
             return dataloader, id2label, label2id, vocab_len
+
+class BertBaselineExperiment(BaseTypingExperimentClass):
+
+    def __init__(self, dataclass):
+        super().__init__(dataclass)
+        self.dataset_class = TypingBERTDataSet
+        self.network_class = BaseBERTTyper
+
+class BertTransformerExperiment(BaseTypingExperimentClass):
+
+    def __init__(self, dataclass):
+        super().__init__(dataclass)
+        self.dataset_class = PaddedTypingBERTDataSet
+        self.network_class = TransformerBERTTyper
+
+class SimplerTransformerBERTTyperExperiment(BaseTypingExperimentClass):
+    def __init__(self, dataclass):
+        super().__init__(dataclass)
+        self.dataset_class = SimplerTypingBERTDataSet
+        self.network_class = SimplerTransformerBERTTyper
+
+class BertHierarchicalExperiment(BaseTypingExperimentClass):
+
+    def __init__(self, dataclass):
+        super().__init__(dataclass)
+        self.dataset_class = PaddedTypingBERTDataSet
+        self.network_class = TransformerWHierarchicalLoss
+
+        self.hierarchical_mode = dataclass.hierarchical_mode
+        self.label_dependency_path = dataclass.label_dependency_path
+
+    def setup(self):
+        self.dataloader_train, id2label, label2id, vocab_len = self.get_dataloader_from_dataset_path(self.train_data_path, 
+                                                                                                shuffle=True, train = True,
+                                                                                                load_path=self.load_train_dataset_path,
+                                                                                                save_path=self.save_train_dataset_path)
+
+        self.dataloader_val = self.get_dataloader_from_dataset_path(self.eval_data_path,
+                                                                id2label=id2label, label2id=label2id, vocab_len=vocab_len,
+                                                                load_path=self.load_eval_dataset_path,
+                                                                save_path=self.save_eval_dataset_path)
+
+        if self.save_auxiliary_variables:
+            with open(self.aux_save_path, "wb") as filino:
+                pickle.dump((id2label, label2id, vocab_len), filino)
+
+
+        if self.weighted:
+            with open(self.weights_path, 'rb') as inp:
+                weights = pickle.load(inp) 
+            ordered_weights = torch.tensor([weights[id2label[i]] for i in range(len(id2label))])
+            self.bt = self.network_class(vocab_len, id2label, label2id, weights=ordered_weights, 
+                                            mode=self.hierarchical_mode, dependecy_file_path = self.label_dependency_path).cuda()
+        else:
+            self.bt = self.network_class(vocab_len, id2label, label2id,
+                                            mode=self.hierarchical_mode, dependecy_file_path = self.label_dependency_path).cuda()
+
+        self.declare_trainer_and_callbacks()
+
+class BertHierarchicalRegularizedExperiment(BertHierarchicalExperiment):
+    def __init__(self, dataclass):
+        super().__init__(dataclass)
+        self.dataset_class = PaddedTypingBERTDataSet
+        self.network_class = TransformerWHierarchicalRegularization
+
+        self.hierarchical_mode = dataclass.hierarchical_mode
+        self.label_dependency_path = dataclass.label_dependency_path
+
+    

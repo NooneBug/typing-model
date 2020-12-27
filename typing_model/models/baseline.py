@@ -1,20 +1,18 @@
 import torch
 from torch import nn
 import pytorch_lightning as pl
+from torch.nn.modules.loss import BCEWithLogitsLoss
 from typing_model.metrics.my_metrics import MyMetrics
+from transformers import BertModel, BertTokenizer
+from typing_model.losses.hierarchical_losses import HierarchicalLoss, HierarchicalRegularization
 
-class BaseBERTTyper(pl.LightningModule):
+class BaseTyper(pl.LightningModule):
     def __init__(self, classes, id2label, label2id, name = 'BertTyper', weights = None):
         super().__init__()
 
         self.id2label = id2label
         self.label2id = label2id
 
-        self.mention_to_hidden = nn.Linear(1024, 200)
-        self.left_to_hidden = nn.Linear(1024, 200)
-        self.right_to_hidden = nn.Linear(1024, 200)
-
-        self.hidden_to_output = nn.Linear(600, classes)
 
         self.sig = nn.Sigmoid()
 
@@ -49,11 +47,14 @@ class BaseBERTTyper(pl.LightningModule):
         
 
     def configure_optimizers(self):
+        # TODO : make lr a hyperparameter
         optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
         return optimizer
 
     def training_step(self, batch, batch_step):
         mention_x, left_x, right_x, labels = batch
+
+        labels = labels.cuda()
 
         model_output = self(mention_x, left_x, right_x)
 
@@ -65,6 +66,8 @@ class BaseBERTTyper(pl.LightningModule):
 
     def validation_step(self, batch, batch_step):
         mention_x, left_x, right_x, labels = batch
+
+        labels = labels.cuda()
 
         model_output = self(mention_x, left_x, right_x)
 
@@ -83,15 +86,7 @@ class BaseBERTTyper(pl.LightningModule):
         
 
     def forward(self, mention, left, right):
-
-        h1 = self.mention_to_hidden(mention)
-        h2 = self.left_to_hidden(left)
-        h3 = self.right_to_hidden(right)
-        concat = torch.cat([h1, h2, h3], dim=1)
-
-        outputs = self.hidden_to_output(concat)
-
-        return outputs
+        raise Exception("Declare a forward which takes in input the mention representation and its contexts")
 
     def compute_loss(self, pred, true):
         return self.classification_loss(pred, true)
@@ -129,3 +124,191 @@ class BaseBERTTyper(pl.LightningModule):
 
         self.log('other_metrics/avg_pred_number', avg_pred_number)
         self.log('other_metrics/void_predictions', void_predictions)
+
+class BaseBERTTyper(BaseTyper):
+    def __init__(self, classes, id2label, label2id, name = 'BertTyper', weights = None):
+        super().__init__(classes, id2label, label2id, name = 'BertTyper', weights = None)
+        self.mention_to_hidden = nn.Linear(1024, 200)
+        self.left_to_hidden = nn.Linear(1024, 200)
+        self.right_to_hidden = nn.Linear(1024, 200)
+
+        self.hidden_to_output = nn.Linear(600, classes)
+
+    def forward(self, mention, left, right):
+
+        h1 = self.mention_to_hidden(mention)
+        h2 = self.left_to_hidden(left)
+        h3 = self.right_to_hidden(right)
+        concat = torch.cat([h1, h2, h3], dim=1)
+
+        outputs = self.hidden_to_output(concat)
+
+        return outputs
+
+class TransformerBERTTyper(BaseTyper):
+
+    def __init__(self, classes, id2label, label2id, name = 'BertTyper', weights = None):
+
+        super().__init__(classes, id2label, label2id, name, weights)
+        # TODO transformer on each embedding (left, right & mention), avgpool on each, separated linear and concat linear 
+        encoder_layer = nn.TransformerEncoderLayer(d_model=768, nhead=8)
+        self.mention_transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=1)
+        self.left_context_transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=1)
+        self.right_context_transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=1)
+
+        self.pooler = nn.AvgPool2d((25, 1))
+
+        self.mention_to_hidden = nn.Linear(768, 200)
+        self.left_to_hidden = nn.Linear(768, 200)
+        self.right_to_hidden = nn.Linear(768, 200)
+
+        self.hidden_to_output = nn.Linear(600, classes)
+
+        # self.tokenizer = BertTokenizer.from_pretrained('bert-large-uncased')
+        
+        self.bert = BertModel.from_pretrained("bert-base-uncased")
+        for param in self.bert.parameters():
+            param.requires_grad = False
+
+    def forward(self, mention, left, right):
+
+        mention = mention.cuda()
+        left = left.cuda()
+        right = right.cuda()
+
+        encoded_mention, _ = self.bert(mention)
+        te_1 = self.mention_transformer_encoder(encoded_mention)
+        pooled_mention = self.pooler(te_1).squeeze()
+        h1 = self.mention_to_hidden(pooled_mention)
+
+
+        encoded_left, _ = self.bert(left)
+        te_2 = self.left_context_transformer_encoder(encoded_left)
+        pooled_left = self.pooler(te_2).squeeze()
+        h2 = self.left_to_hidden(pooled_left)
+
+
+        encoded_right, _ = self.bert(right)
+        te_3 = self.right_context_transformer_encoder(encoded_right)
+        pooled_right = self.pooler(te_3).squeeze()
+        h3 = self.right_to_hidden(pooled_right)
+        concat = torch.cat([h1, h2, h3], dim=1)
+        outputs = self.hidden_to_output(concat)
+
+        return outputs
+
+class SimplerTransformerBERTTyper(BaseBERTTyper):
+
+    def __init__(self, classes, id2label, label2id, name = 'BertTyper', weights = None):
+
+        super().__init__(classes, id2label, label2id, name, weights)
+        # TODO transformer on each embedding (left, right & mention), avgpool on each, separated linear and concat linear 
+        encoder_layer = nn.TransformerEncoderLayer(d_model=768, nhead=8)
+        self.context_transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=1)  
+
+        self.mention_pooler = nn.AvgPool2d((25, 1))
+        self.context_pooler = nn.AvgPool2d((50, 1))
+
+        self.mention_to_hidden = nn.Linear(768, 200)
+        self.context_to_hidden = nn.Linear(768, 200)
+
+        self.hidden_to_output = nn.Linear(400, classes)
+
+        # self.tokenizer = BertTokenizer.from_pretrained('bert-large-uncased')
+        
+        self.bert = BertModel.from_pretrained("bert-base-uncased")
+        for param in self.bert.parameters():
+            param.requires_grad = False
+
+    def forward(self, mention, context):
+
+        mention = mention.cuda()
+        context = context.cuda()
+
+        encoded_mention, _ = self.bert(mention)
+        pooled_mention = self.mention_pooler(encoded_mention).squeeze()
+        h1 = self.mention_to_hidden(pooled_mention)
+
+        # print(encoded_mention.shape)
+        # print(pooled_mention.shape)
+        # print(h1.shape)
+        # print('---------------------')
+
+        encoded_context, _ = self.bert(context)
+        te_2 = self.context_transformer_encoder(encoded_context)
+        pooled_context = self.context_pooler(te_2).squeeze()
+        h2 = self.context_to_hidden(pooled_context)
+
+        # print(encoded_context.shape)
+        # print(te_2.shape)
+        # print(pooled_context.shape)
+        # print(h2.shape)
+
+        
+
+        concat = torch.cat([h1, h2], dim=1)
+        outputs = self.hidden_to_output(concat)
+
+        return outputs
+
+    def training_step(self, batch, batch_step):
+        mention_x, contexts_x, labels = batch
+
+        labels = labels.cuda()
+
+        model_output = self(mention_x, contexts_x)
+
+        loss = self.compute_loss(model_output, labels)
+
+        self.log('train_loss', loss, on_epoch=True, on_step=False)
+
+        return loss
+
+    def validation_step(self, batch, batch_step):
+        mention_x, contexts_x, labels = batch
+
+        labels = labels.cuda()
+
+        model_output = self(mention_x, contexts_x)
+
+        val_loss = self.compute_loss(model_output, labels)
+        
+        # TO DO: log the total val loss, not at each validation step
+        self.log('val_loss', val_loss, on_epoch=True, on_step=False)
+        
+        self.update_metrics(pred=model_output, labels=labels)
+
+        return val_loss
+
+class TransformerWHierarchicalLoss(SimplerTransformerBERTTyper):
+
+    def __init__(self, classes, id2label, label2id, mode, dependecy_file_path, weights = None, name = 'HierarchicalNet'):
+        super().__init__(classes, id2label, label2id, name=name, weights=weights)
+
+        self.classification_loss = BCEWithLogitsLoss(pos_weight=self.weights, reduction='none')
+        self.hierarchical_loss = HierarchicalLoss(mode = mode,
+                                                    id2label= id2label, 
+                                                    label2id = label2id, 
+                                                    label_dependency_file_path = dependecy_file_path)
+
+    def compute_loss(self, pred, true):
+        classification_loss = self.classification_loss(pred, true)
+        pred = self.sig(pred)
+        return  self.hierarchical_loss.compute_loss(classification_loss, pred, true)
+
+class TransformerWHierarchicalRegularization(SimplerTransformerBERTTyper):
+    def __init__(self, classes, id2label, label2id, mode, dependecy_file_path, weights = None, name = 'HierarchicalNet'):
+        super().__init__(classes, id2label, label2id, name=name, weights=weights)
+
+        self.classification_loss = BCEWithLogitsLoss(pos_weight=self.weights)
+        self.hierarchical_regularitazion = HierarchicalRegularization(mode = mode,
+                                                                        id2label= id2label, 
+                                                                        label2id = label2id, 
+                                                                        label_dependency_file_path = dependecy_file_path)
+
+    def compute_loss(self, pred, true):
+        classification_loss = self.classification_loss(pred, true)
+        pred = self.sig(pred)
+        regularization_value = self.hierarchical_regularitazion.compute_loss(pred, true)
+        self.log('other_metrics/regularization_value', regularization_value)
+        return  classification_loss + regularization_value
