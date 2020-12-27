@@ -4,6 +4,23 @@ from transformers import BertTokenizer, BertModel
 import gc
 import torch
 import time
+from typing_model.data.parse_dataset import TreeMaker
+
+class KermitDataset(Dataset):
+
+    # ON HOLD: waiting for issue
+
+    def __init__(self, sentences):
+        self.sentences = sentences
+
+        tm = TreeMaker()
+        parsed = [tm.parse(k) for k in self.sentences]
+
+
+    def __len__(self):
+        return len(self.sentences)
+
+
 
 class TypingDataSet(Dataset):
 
@@ -64,7 +81,7 @@ class PaddedTypingBERTDataSet(TypingDataSet):
         self.mentions = [torch.tensor(t) for t in tokenizer(mentions,
                                                     padding='max_length',
                                                     max_length = 25,
-                                                    truncation=True, 
+                                                    truncation=True,
                                                     return_tensors="pt")['input_ids'].tolist()]
 
         print('mentions encoded in {} seconds'.format(round(time.time() - t, 2)))
@@ -73,7 +90,7 @@ class PaddedTypingBERTDataSet(TypingDataSet):
         self.left_side = [torch.tensor(t) for t in tokenizer(left_side,
                                                     padding='max_length',
                                                     max_length = 25,
-                                                    truncation=True, 
+                                                    truncation=True,
                                                     return_tensors="pt")['input_ids'].tolist()]
 
         print('left_contexts encoded in {} seconds'.format(round(time.time() - t, 2)))
@@ -83,11 +100,11 @@ class PaddedTypingBERTDataSet(TypingDataSet):
         self.right_side = [torch.tensor(t) for t in tokenizer(right_side,
                                                                 padding='max_length',
                                                                 max_length = 25,
-                                                                truncation=True, 
+                                                                truncation=True,
                                                                 return_tensors="pt")['input_ids'].tolist()]
         print('right_contexts encoded in {} seconds'.format(round(time.time() - t, 2)))
-        
-        
+
+
         # del model
         del tokenizer
         # del outs
@@ -99,7 +116,7 @@ class PaddedTypingBERTDataSet(TypingDataSet):
 class SimplerTypingBERTDataSet(Dataset):
 
     def __init__(self, mentions, left_side, right_side, label, id2label, label2id, vocab_size):
-        
+
         self.label = label
         self.vocab_size = vocab_size
 
@@ -119,18 +136,18 @@ class SimplerTypingBERTDataSet(Dataset):
         self.mentions = [torch.tensor(t) for t in tokenizer(mentions,
                                                     padding='max_length',
                                                     max_length = 25,
-                                                    truncation=True, 
+                                                    truncation=True,
                                                     return_tensors="pt")['input_ids'].tolist()]
 
         print('mentions encoded in {} seconds'.format(round(time.time() - t, 2)))
 
-        
+
         t = time.time()
         contexts = [l + ' ' + r for l, r in zip(left_side, right_side)]
         self.contexts = [torch.tensor(t) for t in tokenizer(contexts,
                                                     padding='max_length',
                                                     max_length = 50,
-                                                    truncation=True, 
+                                                    truncation=True,
                                                     return_tensors="pt")['input_ids'].tolist()]
 
         print('contexts encoded in {} seconds'.format(round(time.time() - t, 2)))
@@ -138,12 +155,12 @@ class SimplerTypingBERTDataSet(Dataset):
         torch.cuda.empty_cache()
         gc.collect()
 
-        
-        
-    
+
+
+
     def __len__(self):
         return len(self.mentions)
-    
+
     def __getitem__(self, idx):
         labels_id = self.label_id[idx]
         one_hot = torch.zeros(self.vocab_size)
