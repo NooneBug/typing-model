@@ -33,6 +33,12 @@ class ExperimentRoutine():
 			exp.perform_experiment()
 
 class BaseExperimentClass():
+
+	def __init__(self) -> None:
+		# declare the classes used in this experiment
+		self.network_class = None
+		self.dataset_class = None
+
 	def setup(self, dataclass):
 		# setup all class variables from dataclass and variables needed for instantiate the model
 		raise NotImplementedError
