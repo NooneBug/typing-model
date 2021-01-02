@@ -7,75 +7,67 @@ from transformers import BertModel, BertTokenizer
 from typing_model.losses.hierarchical_losses import HierarchicalLoss, HierarchicalRegularization
 
 class BaseTyper(pl.LightningModule):
-    def __init__(self, classes, id2label, label2id, name = 'BertTyper', weights = None):
+    """
+    Base class for typing, defines the metrix and a few things we need to train the networks
+    """
+    def __init__(self, classes, id2label, label2id, name = "BaseTyper", weights = None, lr=1e-3):
+        # TODO: some parameters are not used but are imported in the subclasses
         super().__init__()
 
         self.id2label = id2label
         self.label2id = label2id
-
+        self.lr = lr
 
         self.sig = nn.Sigmoid()
 
         self.weights = weights
         self.classification_loss = nn.BCEWithLogitsLoss(pos_weight=self.weights)
 
-
-        # Declare Metrics
+        # Declaring evaluation Metrics
         self.micro_precision = pl.metrics.classification.precision_recall.Precision(num_classes=len(self.id2label),
-                                                                                    average='micro', 
+                                                                                    average='micro',
                                                                                     multilabel=True)
         self.micro_recall = pl.metrics.classification.precision_recall.Recall(num_classes=len(self.id2label),
-                                                                                average='micro', 
+                                                                                average='micro',
                                                                                 multilabel=True)
         self.micro_f1 = pl.metrics.classification.F1(num_classes=len(self.id2label),
-                                                        average='micro', 
+                                                        average='micro',
                                                         multilabel=True)
-
         self.macro_precision = pl.metrics.classification.precision_recall.Precision(num_classes=len(self.id2label),
-                                                                                    average='macro', 
+                                                                                    average='macro',
                                                                                     multilabel=True)
-        
+
         self.macro_recall = pl.metrics.classification.precision_recall.Recall(num_classes=len(self.id2label),
-                                                                                    average='macro', 
+                                                                                    average='macro',
                                                                                     multilabel=True)
 
         self.macro_f1 = pl.metrics.classification.F1(num_classes=len(self.id2label),
-                                                        average='macro', 
+                                                        average='macro',
                                                         multilabel=True)
 
         self.my_metrics = MyMetrics(id2label=id2label)
-        
+
 
     def configure_optimizers(self):
-        # TODO : make lr a hyperparameter
-        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
         return optimizer
 
     def training_step(self, batch, batch_step):
         mention_x, left_x, right_x, labels = batch
-
         labels = labels.cuda()
-
         model_output = self(mention_x, left_x, right_x)
-
         loss = self.compute_loss(model_output, labels)
-
         self.log('train_loss', loss, on_epoch=True, on_step=False)
 
         return loss
 
     def validation_step(self, batch, batch_step):
         mention_x, left_x, right_x, labels = batch
-
         labels = labels.cuda()
-
         model_output = self(mention_x, left_x, right_x)
-
         val_loss = self.compute_loss(model_output, labels)
-        
-        # TO DO: log the total val loss, not at each validation step
+        # TODO: log the total val loss, not at each validation step
         self.log('val_loss', val_loss, on_epoch=True, on_step=False)
-        
         self.update_metrics(pred=model_output, labels=labels)
 
         return val_loss
@@ -83,16 +75,14 @@ class BaseTyper(pl.LightningModule):
     def validation_epoch_end(self, out):
         self.compute_metrics()
 
-        
-
-    def forward(self, mention, left, right):
+    def forward(self, *args, **kwargs):
         raise Exception("Declare a forward which takes in input the mention representation and its contexts")
 
     def compute_loss(self, pred, true):
         return self.classification_loss(pred, true)
 
     def update_metrics(self, pred, labels):
-        
+
         pred = self.sig(pred)
 
         self.micro_f1.update(preds=pred, target=labels)
@@ -150,7 +140,7 @@ class TransformerBERTTyper(BaseTyper):
     def __init__(self, classes, id2label, label2id, name = 'BertTyper', weights = None):
 
         super().__init__(classes, id2label, label2id, name, weights)
-        # TODO transformer on each embedding (left, right & mention), avgpool on each, separated linear and concat linear 
+        # TODO transformer on each embedding (left, right & mention), avgpool on each, separated linear and concat linear
         encoder_layer = nn.TransformerEncoderLayer(d_model=768, nhead=8)
         self.mention_transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=1)
         self.left_context_transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=1)
@@ -165,7 +155,7 @@ class TransformerBERTTyper(BaseTyper):
         self.hidden_to_output = nn.Linear(600, classes)
 
         # self.tokenizer = BertTokenizer.from_pretrained('bert-large-uncased')
-        
+
         self.bert = BertModel.from_pretrained("bert-base-uncased")
         for param in self.bert.parameters():
             param.requires_grad = False
@@ -205,7 +195,7 @@ class ConcatenatedContextBERTTyper(BaseTyper):
 
         self.context_pooler = nn.AvgPool2d((max_context_size, 1))
         encoder_layer = nn.TransformerEncoderLayer(d_model=768, nhead=8)
-        self.context_transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=1)  
+        self.context_transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=1)
 
         self.mention_pooler = nn.AvgPool2d((max_mention_size, 1))
         self.mention_to_hidden = nn.Linear(768, 200)
@@ -221,6 +211,8 @@ class ConcatenatedContextBERTTyper(BaseTyper):
             param.requires_grad = False
 
     def forward(self, mention, context):
+
+        # TODO this violates https://en.wikipedia.org/wiki/Liskov_substitution_principle, we might need to inherit from BaseTyper and not BERT Base Typer
 
         mention = mention.cuda()
         context = context.cuda()
@@ -263,7 +255,7 @@ class ConcatenatedContextBERTTyper(BaseTyper):
         val_loss = self.compute_loss(model_output, labels)
         
         self.log('val_loss', val_loss, on_epoch=True, on_step=False)
-        
+
         self.update_metrics(pred=model_output, labels=labels)
 
         return val_loss
@@ -275,8 +267,8 @@ class TransformerWHierarchicalLoss(ConcatenatedContextBERTTyper):
 
         self.classification_loss = BCEWithLogitsLoss(pos_weight=self.weights, reduction='none')
         self.hierarchical_loss = HierarchicalLoss(mode = mode,
-                                                    id2label= id2label, 
-                                                    label2id = label2id, 
+                                                    id2label= id2label,
+                                                    label2id = label2id,
                                                     label_dependency_file_path = dependecy_file_path)
 
     def compute_loss(self, pred, true):
@@ -290,8 +282,8 @@ class TransformerWHierarchicalRegularization(ConcatenatedContextBERTTyper):
 
         self.classification_loss = BCEWithLogitsLoss(pos_weight=self.weights)
         self.hierarchical_regularitazion = HierarchicalRegularization(mode = mode,
-                                                                        id2label= id2label, 
-                                                                        label2id = label2id, 
+                                                                        id2label= id2label,
+                                                                        label2id = label2id,
                                                                         label_dependency_file_path = dependecy_file_path)
 
     def compute_loss(self, pred, true):
