@@ -302,4 +302,4 @@ class BertOnlyContextExperiment(BaseTypingExperimentClass):
 
 	def instance_model(self):
 		self.bt = self.network_class(self.vocab_len, self.id2label, self.label2id, weights=self.ordered_weights, 
-											max_mention_size=self.context_max_length).cuda()
+											max_context_size=self.context_max_length).cuda()
