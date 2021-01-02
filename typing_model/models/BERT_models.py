@@ -135,58 +135,6 @@ class BaseBERTTyper(BaseTyper):
 
         return outputs
 
-class TransformerBERTTyper(BaseTyper):
-
-    def __init__(self, classes, id2label, label2id, name = 'BertTyper', weights = None):
-
-        super().__init__(classes, id2label, label2id, name, weights)
-        # TODO transformer on each embedding (left, right & mention), avgpool on each, separated linear and concat linear
-        encoder_layer = nn.TransformerEncoderLayer(d_model=768, nhead=8)
-        self.mention_transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=1)
-        self.left_context_transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=1)
-        self.right_context_transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=1)
-
-        self.pooler = nn.AvgPool2d((25, 1))
-
-        self.mention_to_hidden = nn.Linear(768, 200)
-        self.left_to_hidden = nn.Linear(768, 200)
-        self.right_to_hidden = nn.Linear(768, 200)
-
-        self.hidden_to_output = nn.Linear(600, classes)
-
-        # self.tokenizer = BertTokenizer.from_pretrained('bert-large-uncased')
-
-        self.bert = BertModel.from_pretrained("bert-base-uncased")
-        for param in self.bert.parameters():
-            param.requires_grad = False
-
-    def forward(self, mention, left, right):
-
-        mention = mention.cuda()
-        left = left.cuda()
-        right = right.cuda()
-
-        encoded_mention, _ = self.bert(mention)
-        te_1 = self.mention_transformer_encoder(encoded_mention)
-        pooled_mention = self.pooler(te_1).squeeze()
-        h1 = self.mention_to_hidden(pooled_mention)
-
-
-        encoded_left, _ = self.bert(left)
-        te_2 = self.left_context_transformer_encoder(encoded_left)
-        pooled_left = self.pooler(te_2).squeeze()
-        h2 = self.left_to_hidden(pooled_left)
-
-
-        encoded_right, _ = self.bert(right)
-        te_3 = self.right_context_transformer_encoder(encoded_right)
-        pooled_right = self.pooler(te_3).squeeze()
-        h3 = self.right_to_hidden(pooled_right)
-        concat = torch.cat([h1, h2, h3], dim=1)
-        outputs = self.hidden_to_output(concat)
-
-        return outputs
-
 class ConcatenatedContextBERTTyper(BaseTyper):
 
     def __init__(self, classes, id2label, label2id, max_mention_size=9, max_context_size=40, name = 'BertTyper', weights = None):
