@@ -212,17 +212,14 @@ class ConcatenatedContextBERTTyper(BaseTyper):
 
     def forward(self, mention, context):
 
-        # TODO this violates https://en.wikipedia.org/wiki/Liskov_substitution_principle, we might need to inherit from BaseTyper and not BERT Base Typer
-
         mention = mention.cuda()
         context = context.cuda()
 
-        encoded_mention, _ = self.bert(mention)
+        encoded_mention = self.bert(mention).last_hidden_state
         pooled_mention = self.mention_pooler(encoded_mention).squeeze()
         h1 = self.droppy(self.relu(self.mention_to_hidden(pooled_mention)))
 
-
-        encoded_context, _ = self.bert(context)
+        encoded_context = self.bert(context).last_hidden_state
         te_2 = self.context_transformer_encoder(encoded_context)
         pooled_context = self.context_pooler(te_2).squeeze()
         h2 = self.droppy(self.relu(self.context_to_hidden(pooled_context)))
@@ -316,7 +313,7 @@ class OnlyMentionBERTTyper(BaseTyper):
 
         mention = mention.cuda()
 
-        encoded_mention, _ = self.bert(mention)
+        encoded_mention = self.bert(mention).last_hidden_state
         pooled_mention = self.mention_pooler(encoded_mention).squeeze()
         h1 = self.droppy(self.relu(self.mention_to_hidden(pooled_mention)))
 
@@ -379,7 +376,7 @@ class OnlyContextBERTTyper(BaseTyper):
 
         context = context.cuda()
 
-        encoded_context, _ = self.bert(context)
+        encoded_context = self.bert(context).last_hidden_state
         te_2 = self.context_transformer_encoder(encoded_context)
         pooled_context = self.context_pooler(te_2).squeeze()
         h1 = self.droppy(self.relu(self.context_to_hidden(pooled_context)))

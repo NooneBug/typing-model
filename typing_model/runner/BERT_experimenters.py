@@ -1,6 +1,6 @@
 from build.lib.typing_model import data
 from typing_model.data.utils import DatasetParser
-from typing_model.data.dataset import OnlyContextBERTDataset, TypingBERTDataSet, PaddedTypingBERTDataSet, ConcatenatedContextTypingBERTDataSet, OnlyMentionBERTDataset
+from typing_model.data.BERT_datasets import OnlyContextBERTDataset, TypingBERTDataSet, PaddedTypingBERTDataSet, ConcatenatedContextTypingBERTDataSet, OnlyMentionBERTDataset
 from torch.utils.data import DataLoader
 from typing_model.models.BERT_models import BaseBERTTyper, OnlyContextBERTTyper, TransformerBERTTyper, TransformerWHierarchicalLoss, ConcatenatedContextBERTTyper, TransformerWHierarchicalRegularization, OnlyMentionBERTTyper
 from pytorch_lightning.callbacks import ModelCheckpoint
