@@ -4,7 +4,9 @@ from transformers import BertTokenizer, BertModel
 import gc
 import torch
 import time
-from typing_model.data.parse_dataset import TreeMaker
+from typing_model.data.utils import TreeMaker
+from typing_model.data.utils import GloveManager
+import numpy as np
 
 class KermitDataset(Dataset):
 
@@ -112,10 +114,9 @@ class PaddedTypingBERTDataSet(TypingDataSet):
         torch.cuda.empty_cache()
         gc.collect()
 
-
-class SimplerTypingBERTDataSet(Dataset):
-
-    def __init__(self, mentions, left_side, right_side, label, id2label, label2id, vocab_size):
+class OnlyMentionBERTDataset(Dataset):
+    def __init__(self, mentions, label, id2label, label2id, vocab_size, 
+                    mention_max_tokens):
 
         self.label = label
         self.vocab_size = vocab_size
@@ -123,11 +124,9 @@ class SimplerTypingBERTDataSet(Dataset):
         self.id2label = id2label
         self.label2id = label2id
         self.label_id = [[self.label2id[v] for v in k] for k in self.label]
+        self.mention_max_tokens = mention_max_tokens
 
-        # TO DO: add hyperparameter to BERT encodings (max_length)
-        # print('torch.cuda.current_device(): {}'.format(torch.cuda.current_device()))
         tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        # model = BertModel.from_pretrained("bert-base-uncased")
 
         print('encoding dataset...')
 
@@ -135,7 +134,87 @@ class SimplerTypingBERTDataSet(Dataset):
         t = time.time()
         self.mentions = [torch.tensor(t) for t in tokenizer(mentions,
                                                     padding='max_length',
-                                                    max_length = 25,
+                                                    max_length = self.mention_max_tokens,
+                                                    truncation=True,
+                                                    return_tensors="pt")['input_ids'].tolist()]
+
+        print('mentions encoded in {} seconds'.format(round(time.time() - t, 2)))
+
+    def __len__(self):
+        return len(self.mentions)
+
+    def __getitem__(self, idx):
+        labels_id = self.label_id[idx]
+        one_hot = torch.zeros(self.vocab_size)
+        one_hot[labels_id] = 1
+
+        return self.mentions[idx], one_hot
+
+class OnlyContextBERTDataset(Dataset):
+    def __init__(self, left_side, right_side, label, id2label, label2id, vocab_size, 
+                    context_max_tokens):
+
+        self.label = label
+        self.vocab_size = vocab_size
+
+        self.id2label = id2label
+        self.label2id = label2id
+        self.label_id = [[self.label2id[v] for v in k] for k in self.label]
+        self.context_max_tokens = context_max_tokens
+
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+
+        print('encoding dataset...')
+
+        t = time.time()
+
+        extracted_left_side = [' '.join(l.split(' ')[:- int(np.floor(self.context_max_tokens/2))]) for l in left_side]
+        extracted_right_side = [' '.join(r.split(' ')[: int(np.floor(self.context_max_tokens/2))]) for r in right_side]
+
+        contexts = [l + ' ' + r for l, r in zip(extracted_left_side, extracted_right_side)]
+        self.contexts = [torch.tensor(t) for t in tokenizer(contexts,
+                                                    padding='max_length',
+                                                    max_length = self.context_max_tokens,
+                                                    truncation=True,
+                                                    return_tensors="pt")['input_ids'].tolist()]
+
+        print('contexts encoded in {} seconds'.format(round(time.time() - t, 2)))
+
+    def __len__(self):
+        return len(self.contexts)
+
+    def __getitem__(self, idx):
+        labels_id = self.label_id[idx]
+        one_hot = torch.zeros(self.vocab_size)
+        one_hot[labels_id] = 1
+
+        return self.contexts[idx], one_hot
+
+
+class ConcatenatedContextTypingBERTDataSet(Dataset):
+
+    def __init__(self, mentions, left_side, right_side, label, id2label, label2id, vocab_size, 
+                    mention_max_tokens, context_max_tokens):
+
+        self.label = label
+        self.vocab_size = vocab_size
+
+        self.id2label = id2label
+        self.label2id = label2id
+        self.label_id = [[self.label2id[v] for v in k] for k in self.label]
+        self.mention_max_tokens = mention_max_tokens
+        self.context_max_tokens = context_max_tokens
+
+        # TO DO: add hyperparameter to BERT encodings (max_length)
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+
+        print('encoding dataset...')
+
+
+        t = time.time()
+        self.mentions = [torch.tensor(t) for t in tokenizer(mentions,
+                                                    padding='max_length',
+                                                    max_length = self.mention_max_tokens,
                                                     truncation=True,
                                                     return_tensors="pt")['input_ids'].tolist()]
 
@@ -143,10 +222,13 @@ class SimplerTypingBERTDataSet(Dataset):
 
 
         t = time.time()
-        contexts = [l + ' ' + r for l, r in zip(left_side, right_side)]
+        extracted_left_side = [' '.join(l.split(' ')[:- int(np.floor(self.context_max_tokens/2))]) for l in left_side]
+        extracted_right_side = [' '.join(r.split(' ')[: int(np.floor(self.context_max_tokens/2))]) for r in right_side]
+
+        contexts = [l + ' ' + r for l, r in zip(extracted_left_side, extracted_right_side)]
         self.contexts = [torch.tensor(t) for t in tokenizer(contexts,
                                                     padding='max_length',
-                                                    max_length = 50,
+                                                    max_length = self.context_max_tokens,
                                                     truncation=True,
                                                     return_tensors="pt")['input_ids'].tolist()]
 
@@ -154,9 +236,6 @@ class SimplerTypingBERTDataSet(Dataset):
         del tokenizer
         torch.cuda.empty_cache()
         gc.collect()
-
-
-
 
     def __len__(self):
         return len(self.mentions)
@@ -167,3 +246,11 @@ class SimplerTypingBERTDataSet(Dataset):
         one_hot[labels_id] = 1
 
         return self.mentions[idx], self.contexts[idx], one_hot
+
+
+class GloveDataset(Dataset):
+    def __init__(self, path_to_glove_embeddings):
+        super().__init__()
+        self.gm = GloveManager()
+        embedding_dict = self.gm.load_embedding_dict(path_to_glove_embeddings)
+        

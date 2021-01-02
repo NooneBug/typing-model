@@ -197,24 +197,24 @@ class TransformerBERTTyper(BaseTyper):
 
         return outputs
 
-class SimplerTransformerBERTTyper(BaseBERTTyper):
+class ConcatenatedContextBERTTyper(BaseTyper):
 
-    def __init__(self, classes, id2label, label2id, name = 'BertTyper', weights = None):
+    def __init__(self, classes, id2label, label2id, max_mention_size=9, max_context_size=40, name = 'BertTyper', weights = None):
 
         super().__init__(classes, id2label, label2id, name, weights)
-        # TODO transformer on each embedding (left, right & mention), avgpool on each, separated linear and concat linear 
+
+        self.context_pooler = nn.AvgPool2d((max_context_size, 1))
         encoder_layer = nn.TransformerEncoderLayer(d_model=768, nhead=8)
         self.context_transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=1)  
 
-        self.mention_pooler = nn.AvgPool2d((25, 1))
-        self.context_pooler = nn.AvgPool2d((50, 1))
-
+        self.mention_pooler = nn.AvgPool2d((max_mention_size, 1))
         self.mention_to_hidden = nn.Linear(768, 200)
         self.context_to_hidden = nn.Linear(768, 200)
-
         self.hidden_to_output = nn.Linear(400, classes)
 
-        # self.tokenizer = BertTokenizer.from_pretrained('bert-large-uncased')
+        self.droppy = nn.Dropout(0.2)
+        self.relu = nn.ReLU()
+
         
         self.bert = BertModel.from_pretrained("bert-base-uncased")
         for param in self.bert.parameters():
@@ -227,24 +227,13 @@ class SimplerTransformerBERTTyper(BaseBERTTyper):
 
         encoded_mention, _ = self.bert(mention)
         pooled_mention = self.mention_pooler(encoded_mention).squeeze()
-        h1 = self.mention_to_hidden(pooled_mention)
+        h1 = self.droppy(self.relu(self.mention_to_hidden(pooled_mention)))
 
-        # print(encoded_mention.shape)
-        # print(pooled_mention.shape)
-        # print(h1.shape)
-        # print('---------------------')
 
         encoded_context, _ = self.bert(context)
         te_2 = self.context_transformer_encoder(encoded_context)
         pooled_context = self.context_pooler(te_2).squeeze()
-        h2 = self.context_to_hidden(pooled_context)
-
-        # print(encoded_context.shape)
-        # print(te_2.shape)
-        # print(pooled_context.shape)
-        # print(h2.shape)
-
-        
+        h2 = self.droppy(self.relu(self.context_to_hidden(pooled_context)))
 
         concat = torch.cat([h1, h2], dim=1)
         outputs = self.hidden_to_output(concat)
@@ -273,14 +262,13 @@ class SimplerTransformerBERTTyper(BaseBERTTyper):
 
         val_loss = self.compute_loss(model_output, labels)
         
-        # TO DO: log the total val loss, not at each validation step
         self.log('val_loss', val_loss, on_epoch=True, on_step=False)
         
         self.update_metrics(pred=model_output, labels=labels)
 
         return val_loss
 
-class TransformerWHierarchicalLoss(SimplerTransformerBERTTyper):
+class TransformerWHierarchicalLoss(ConcatenatedContextBERTTyper):
 
     def __init__(self, classes, id2label, label2id, mode, dependecy_file_path, weights = None, name = 'HierarchicalNet'):
         super().__init__(classes, id2label, label2id, name=name, weights=weights)
@@ -296,7 +284,7 @@ class TransformerWHierarchicalLoss(SimplerTransformerBERTTyper):
         pred = self.sig(pred)
         return  self.hierarchical_loss.compute_loss(classification_loss, pred, true)
 
-class TransformerWHierarchicalRegularization(SimplerTransformerBERTTyper):
+class TransformerWHierarchicalRegularization(ConcatenatedContextBERTTyper):
     def __init__(self, classes, id2label, label2id, mode, dependecy_file_path, weights = None, name = 'HierarchicalNet'):
         super().__init__(classes, id2label, label2id, name=name, weights=weights)
 
@@ -312,3 +300,127 @@ class TransformerWHierarchicalRegularization(SimplerTransformerBERTTyper):
         regularization_value = self.hierarchical_regularitazion.compute_loss(pred, true)
         self.log('other_metrics/regularization_value', regularization_value)
         return  classification_loss + regularization_value
+
+class OnlyMentionBERTTyper(BaseTyper):
+
+    def __init__(self, classes, id2label, label2id, max_mention_size = 9, name = 'BertTyper', weights = None):
+
+        super().__init__(classes, id2label, label2id, name, weights)
+
+        self.mention_pooler = nn.AvgPool2d((max_mention_size, 1))
+
+        self.mention_to_hidden = nn.Linear(768, 200)
+
+        self.hidden_to_output = nn.Linear(200, classes)
+
+        self.droppy = nn.Dropout(0.2)
+        self.relu = nn.ReLU()
+
+        self.bert = BertModel.from_pretrained("bert-base-uncased")
+        for param in self.bert.parameters():
+            param.requires_grad = False
+
+    def forward(self, mention):
+
+        mention = mention.cuda()
+
+        encoded_mention, _ = self.bert(mention)
+        pooled_mention = self.mention_pooler(encoded_mention).squeeze()
+        h1 = self.droppy(self.relu(self.mention_to_hidden(pooled_mention)))
+
+        outputs = self.hidden_to_output(h1)
+
+        return outputs
+
+    def training_step(self, batch, batch_step):
+        mention_x, labels = batch
+
+        labels = labels.cuda()
+
+        model_output = self(mention_x)
+
+        loss = self.compute_loss(model_output, labels)
+
+        self.log('train_loss', loss, on_epoch=True, on_step=False)
+
+        return loss
+
+    def validation_step(self, batch, batch_step):
+        mention_x, labels = batch
+
+        labels = labels.cuda()
+
+        model_output = self(mention_x)
+
+        val_loss = self.compute_loss(model_output, labels)
+        
+        # TO DO: log the total val loss, not at each validation step
+        self.log('val_loss', val_loss, on_epoch=True, on_step=False)
+        
+        self.update_metrics(pred=model_output, labels=labels)
+
+        return val_loss
+
+class OnlyContextBERTTyper(BaseTyper):
+
+    def __init__(self, classes, id2label, label2id, max_context_size=40, name = 'BertTyper', weights = None):
+
+        super().__init__(classes, id2label, label2id, name, weights)
+
+        self.context_pooler = nn.AvgPool2d((max_context_size, 1))
+
+        self.context_to_hidden = nn.Linear(768, 200)
+
+        self.hidden_to_output = nn.Linear(200, classes)
+
+        encoder_layer = nn.TransformerEncoderLayer(d_model=768, nhead=8)
+        self.context_transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=1)  
+
+        self.droppy = nn.Dropout(0.2)
+        self.relu = nn.ReLU()
+        
+        self.bert = BertModel.from_pretrained("bert-base-uncased")
+        for param in self.bert.parameters():
+            param.requires_grad = False
+
+    def forward(self, context):
+
+        context = context.cuda()
+
+        encoded_context, _ = self.bert(context)
+        te_2 = self.context_transformer_encoder(encoded_context)
+        pooled_context = self.context_pooler(te_2).squeeze()
+        h1 = self.droppy(self.relu(self.context_to_hidden(pooled_context)))
+
+        outputs = self.hidden_to_output(h1)
+
+        return outputs
+
+    def training_step(self, batch, batch_step):
+        context_x, labels = batch
+
+        labels = labels.cuda()
+
+        model_output = self(context_x)
+
+        loss = self.compute_loss(model_output, labels)
+
+        self.log('train_loss', loss, on_epoch=True, on_step=False)
+
+        return loss
+
+    def validation_step(self, batch, batch_step):
+        context_x, labels = batch
+
+        labels = labels.cuda()
+
+        model_output = self(context_x)
+
+        val_loss = self.compute_loss(model_output, labels)
+        
+        # TO DO: log the total val loss, not at each validation step
+        self.log('val_loss', val_loss, on_epoch=True, on_step=False)
+        
+        self.update_metrics(pred=model_output, labels=labels)
+
+        return val_loss

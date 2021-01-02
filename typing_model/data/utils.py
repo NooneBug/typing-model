@@ -1,6 +1,9 @@
 import json
-from stanfordcorenlp import StanfordCoreNLP
+# from stanfordcorenlp import StanfordCoreNLP
 import ast
+import numpy as np
+from collections import defaultdict
+from tqdm import tqdm
 
 class TreeMaker():
     def __init__(self):
@@ -88,3 +91,20 @@ class DatasetParser:
             labels.append(l['y_str'])
 
         return mentions, left_context, right_context, labels
+
+class GloveManager():
+    def load_embedding_dict(self, embedding_path, embedding_size = 300):
+        print("Loading word embeddings from {}...".format(embedding_path))
+        default_embedding = np.zeros(embedding_size)
+        embedding_dict = defaultdict(lambda: default_embedding)
+        with open(embedding_path) as f:
+            for line in tqdm(f.readlines()):
+                splits = line.split()
+                if len(splits) != embedding_size + 1:
+                    continue
+                assert len(splits) == embedding_size + 1
+                word = splits[0]
+                embedding = np.array([float(s) for s in splits[1:]])
+                embedding_dict[word] = embedding
+        print("Done loading word embeddings!")
+        return embedding_dict

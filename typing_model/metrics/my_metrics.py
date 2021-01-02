@@ -104,8 +104,10 @@ class MyMetrics(Metric):
                 recall_sum += r	
                 f1_sum += f1
 
-
-        micro_p = correct_counter / prediction_counter	
+        if prediction_counter:
+          micro_p = correct_counter / prediction_counter
+        else:
+          micro_p = 0
         micro_r = correct_counter / true_labels_counter	
         micro_f1 = self.compute_f1(micro_p, micro_r)	
 

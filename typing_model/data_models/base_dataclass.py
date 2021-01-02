@@ -45,12 +45,19 @@ class BertBaselineDataclass(BaseDataclass):
     hierarchical_mode : str = None
     label_dependency_path : str = None
 
+    max_mention_size : int = None
+    max_context_size : int = None
+
     def __post_init__(self):
         self.early_stopping = bool(self.early_stopping)
         self.early_stopping_patience = int(self.early_stopping_patience)
         self.epochs = int(self.epochs)
         self.save_auxiliary_variables = bool(self.save_auxiliary_variables)
         self.weighted = bool(self.weighted)
+        if self.max_mention_size:
+            self.max_mention_size = int(self.max_mention_size)
+        if self.max_context_size:
+            self.max_context_size = int(self.max_context_size)
 
     # early_stopping = bool(early_stopping)
     # early_stopping_patience = int(early_stopping_patience)
