@@ -34,14 +34,16 @@ class ExperimentRoutine():
 
 class BaseExperimentClass():
 	def setup(self, dataclass):
-		# setup all class variables from dataclass
+		# setup all class variables from dataclass and variables needed for instantiate the model
 		raise NotImplementedError
-
 
 	def perform_experiment(self):
 		# perform the experiment
 		raise NotImplementedError
 
+	def instance_model(self):
+		# instantiate the experiment's NN model
+		raise NotImplementedError
 
 class BaseTypingExperimentClass(BaseExperimentClass):
 
@@ -79,33 +81,36 @@ class BaseTypingExperimentClass(BaseExperimentClass):
 		self.max_context_size = dataclass.max_context_size
 
 	def setup(self):
-		self.dataloader_train, id2label, label2id, vocab_len = self.get_dataloader_from_dataset_path(self.train_data_path, 
+		self.dataloader_train, self.id2label, self.label2id, self.vocab_len = self.get_dataloader_from_dataset_path(self.train_data_path, 
 																								shuffle=True, train = True,
 																								load_path=self.load_train_dataset_path,
 																								save_path=self.save_train_dataset_path)
 
 		self.dataloader_val = self.get_dataloader_from_dataset_path(self.eval_data_path,
-																id2label=id2label, label2id=label2id, vocab_len=vocab_len,
+																id2label=self.id2label, label2id=self.label2id, vocab_len=self.vocab_len,
 																load_path=self.load_eval_dataset_path,
 																save_path=self.save_eval_dataset_path)
 
 		if self.save_auxiliary_variables:
 			with open(self.aux_save_path, "wb") as filino:
-				pickle.dump((id2label, label2id, vocab_len), filino)
+				pickle.dump((self.id2label, self.label2id, self.vocab_len), filino)
 
 
 		if self.weighted:
 			with open(self.weights_path, 'rb') as inp:
 				weights = pickle.load(inp) 
-			ordered_weights = torch.tensor([weights[id2label[i]] for i in range(len(id2label))])
-			self.bt = self.network_class(vocab_len, id2label, label2id, weights=ordered_weights, 
-										max_mention_size = self.max_mention_size, max_context_size = self.max_context_size).cuda()
+			self.ordered_weights = torch.tensor([weights[self.id2label[i]] for i in range(len(self.id2label))])
 		else:
-			self.bt = self.network_class(vocab_len, id2label, label2id, 
-										max_mention_size = self.max_mention_size, max_context_size = self.max_context_size).cuda()
+			self.ordered_weights = None
+
+		self.instance_model()
 
 		self.declare_trainer_and_callbacks()
 
+	def instance_model(self):
+		self.bt = self.network_class(self.vocab_len, self.id2label, self.label2id, weights=self.ordered_weights, 
+										max_mention_size = self.max_mention_size, max_context_size = self.max_context_size).cuda()
+		
 	def declare_trainer_and_callbacks(self):
 		# declare callbacks
 		callbacks = []
@@ -195,33 +200,9 @@ class BertHierarchicalExperiment(BaseTypingExperimentClass):
 		self.hierarchical_mode = dataclass.hierarchical_mode
 		self.label_dependency_path = dataclass.label_dependency_path
 
-	def setup(self):
-		self.dataloader_train, id2label, label2id, vocab_len = self.get_dataloader_from_dataset_path(self.train_data_path, 
-																								shuffle=True, train = True,
-																								load_path=self.load_train_dataset_path,
-																								save_path=self.save_train_dataset_path)
-
-		self.dataloader_val = self.get_dataloader_from_dataset_path(self.eval_data_path,
-																id2label=id2label, label2id=label2id, vocab_len=vocab_len,
-																load_path=self.load_eval_dataset_path,
-																save_path=self.save_eval_dataset_path)
-
-		if self.save_auxiliary_variables:
-			with open(self.aux_save_path, "wb") as filino:
-				pickle.dump((id2label, label2id, vocab_len), filino)
-
-
-		if self.weighted:
-			with open(self.weights_path, 'rb') as inp:
-				weights = pickle.load(inp) 
-			ordered_weights = torch.tensor([weights[id2label[i]] for i in range(len(id2label))])
-			self.bt = self.network_class(vocab_len, id2label, label2id, weights=ordered_weights, 
+	def instance_model(self):
+		self.bt = self.network_class(self.vocab_len, self.id2label, self.label2id, weights=self.ordered_weights, 
 											mode=self.hierarchical_mode, dependecy_file_path = self.label_dependency_path).cuda()
-		else:
-			self.bt = self.network_class(vocab_len, id2label, label2id,
-											mode=self.hierarchical_mode, dependecy_file_path = self.label_dependency_path).cuda()
-
-		self.declare_trainer_and_callbacks()
 
 class BertHierarchicalRegularizedExperiment(BertHierarchicalExperiment):
 	def __init__(self, dataclass):
@@ -273,32 +254,9 @@ class BertOnlyMentionExperiment(BaseTypingExperimentClass):
 		else:
 			return dataloader, id2label, label2id, vocab_len
 
-	def setup(self):
-		self.dataloader_train, id2label, label2id, vocab_len = self.get_dataloader_from_dataset_path(self.train_data_path, 
-																								shuffle=True, train = True,
-																								load_path=self.load_train_dataset_path,
-																								save_path=self.save_train_dataset_path)
-
-		self.dataloader_val = self.get_dataloader_from_dataset_path(self.eval_data_path,
-																id2label=id2label, label2id=label2id, vocab_len=vocab_len,
-																load_path=self.load_eval_dataset_path,
-																save_path=self.save_eval_dataset_path)
-
-		if self.save_auxiliary_variables:
-			with open(self.aux_save_path, "wb") as filino:
-				pickle.dump((id2label, label2id, vocab_len), filino)
-
-
-		if self.weighted:
-			with open(self.weights_path, 'rb') as inp:
-				weights = pickle.load(inp) 
-			ordered_weights = torch.tensor([weights[id2label[i]] for i in range(len(id2label))])
-			self.bt = self.network_class(vocab_len, id2label, label2id, weights=ordered_weights, 
+	def instance_model(self):
+		self.bt = self.network_class(self.vocab_len, self.id2label, self.label2id, weights=self.ordered_weights, 
 											max_mention_size=self.mention_max_length).cuda()
-		else:
-			self.bt = self.network_class(vocab_len, id2label, label2id, max_mention_size=self.mention_max_length).cuda()
-
-		self.declare_trainer_and_callbacks()
 
 class BertOnlyContextExperiment(BaseTypingExperimentClass):
 	def __init__(self, dataclass):
@@ -342,29 +300,6 @@ class BertOnlyContextExperiment(BaseTypingExperimentClass):
 		else:
 			return dataloader, id2label, label2id, vocab_len
 
-	def setup(self):
-		self.dataloader_train, id2label, label2id, vocab_len = self.get_dataloader_from_dataset_path(self.train_data_path, 
-																								shuffle=True, train = True,
-																								load_path=self.load_train_dataset_path,
-																								save_path=self.save_train_dataset_path)
-
-		self.dataloader_val = self.get_dataloader_from_dataset_path(self.eval_data_path,
-																id2label=id2label, label2id=label2id, vocab_len=vocab_len,
-																load_path=self.load_eval_dataset_path,
-																save_path=self.save_eval_dataset_path)
-
-		if self.save_auxiliary_variables:
-			with open(self.aux_save_path, "wb") as filino:
-				pickle.dump((id2label, label2id, vocab_len), filino)
-
-
-		if self.weighted:
-			with open(self.weights_path, 'rb') as inp:
-				weights = pickle.load(inp) 
-			ordered_weights = torch.tensor([weights[id2label[i]] for i in range(len(id2label))])
-			self.bt = self.network_class(vocab_len, id2label, label2id, weights=ordered_weights, 
-											max_context_size=self.context_max_length).cuda()
-		else:
-			self.bt = self.network_class(vocab_len, id2label, label2id, max_context_size=self.context_max_length).cuda()
-
-		self.declare_trainer_and_callbacks()
+	def instance_model(self):
+		self.bt = self.network_class(self.vocab_len, self.id2label, self.label2id, weights=self.ordered_weights, 
+											max_mention_size=self.context_max_length).cuda()
