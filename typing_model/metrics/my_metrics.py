@@ -22,24 +22,6 @@ class MyMetrics(Metric):
         p, t = self.logits_and_one_hot_labels_to_string(logits=preds, one_hot_labels=target)	
         self.pred_classes.extend(p)	
         self.true_classes.extend(t)
-        # OH_P = [[self.label2id[l] for l in single_batch] for single_batch in self.pred_classes]
-        # OH_T = [[self.label2id[l] for l in single_batch] for single_batch in self.true_classes]
-        # OH_CP = [[self.label2id[p] for p in s_batch_p if p in s_batch_t] for s_batch_p, s_batch_t in zip(self.pred_classes, self.true_classes)]
-
-        # oh_p = torch.zeros(len(self.label2id))
-        # oh_t = torch.zeros(len(self.label2id))
-        # oh_cp = torch.zeros(len(self.label2id))
-
-        # for sub in OH_P:
-        #     for value in sub:
-        #         oh_p[value] += 1
-        # for sub in OH_T:
-        #     for value in sub:
-        #         oh_t[value] += 1
-        # for sub in OH_CP:
-        #     for value in sub:
-        #         oh_cp[value] += 1
-        
 
     def compute(self):
         assert len(self.pred_classes) == len(self.true_classes), "Error in id2label traduction"	

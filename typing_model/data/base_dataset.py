@@ -15,7 +15,7 @@ class TypingDataSet(Dataset):
         self.label_id = [[self.label2id[v] for v in k] for k in self.label]
 
     def __len__(self):
-        return len(self.left_side)
+        return len(self.mentions)
 
     def __getitem__(self, idx):
         labels_id = self.label_id[idx]

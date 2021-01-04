@@ -1,17 +1,8 @@
 from dataclasses import dataclass
+from torch.utils import data
 
 @dataclass
 class BaseDataclass:
-    train_data_path : str
-    eval_data_path : str
-    test_data_path : str
-
-    # early_stopping : bool
-    early_stopping_patience : int
-    epochs : int
-
-@dataclass
-class BertBaselineDataclass(BaseDataclass):
     train_data_path : str 
     eval_data_path : str 
     test_data_path : str 
@@ -45,6 +36,9 @@ class BertBaselineDataclass(BaseDataclass):
     hierarchical_mode : str = None
     label_dependency_path : str = None
 
+    train_batch_size : int = 500
+    eval_batch_size : int = 500
+
     max_mention_size : int = None
     max_context_size : int = None
 
@@ -58,7 +52,18 @@ class BertBaselineDataclass(BaseDataclass):
             self.max_mention_size = int(self.max_mention_size)
         if self.max_context_size:
             self.max_context_size = int(self.max_context_size)
+        self.train_batch_size = int(self.train_batch_size)
+        self.eval_batch_size = int(self.eval_batch_size)
 
-    # early_stopping = bool(early_stopping)
-    # early_stopping_patience = int(early_stopping_patience)
-    # epochs = int(epochs)
+@dataclass
+class ElmoDataclass(BaseDataclass):
+    option_file : str = None
+    elmo_weight_file : str = None
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        if not self.option_file:
+            raise Exception('Please, provide an option file for ELMo model')
+        if not self.elmo_weight_file:
+            raise Exception('Please, provide a weight file for ELMo model')
