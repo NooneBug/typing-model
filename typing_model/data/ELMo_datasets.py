@@ -23,7 +23,7 @@ class ElmoConcatenatedContextDataset(TypingDataSet):
         if max_mention_size:
             mentions = [m[:max_mention_size] for m in mentions]
         if max_context_size:
-            context = [l[: - int(max_context_size/2)] + ' ' + r[: int(max_context_size/2)] for l, r in zip(left_side, right_side)]
+            context = [l[- int(max_context_size/2):] + ' ' + r[: int(max_context_size/2)] for l, r in zip(left_side, right_side)]
         else:
             context = [l + ' ' + r for l, r in zip(left_side, right_side)]
         self.mentions = batch_to_ids([m.split(' ') for m in mentions])

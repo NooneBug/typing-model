@@ -115,7 +115,7 @@ class OnlyContextBERTDataset(TypingDataSet):
 
         t = time.time()
 
-        extracted_left_side = [' '.join(l.split(' ')[:- int(np.floor(self.context_max_tokens/2))]) for l in left_side]
+        extracted_left_side = [' '.join(l.split(' ')[- int(np.floor(self.context_max_tokens/2)):]) for l in left_side]
         extracted_right_side = [' '.join(r.split(' ')[: int(np.floor(self.context_max_tokens/2))]) for r in right_side]
 
         contexts = [l + ' ' + r for l, r in zip(extracted_left_side, extracted_right_side)]
@@ -143,12 +143,15 @@ class ConcatenatedContextTypingBERTDataSet(TypingDataSet):
     def __init__(self, mentions, left_side, right_side, label, id2label, label2id, vocab_size, 
                     mention_max_tokens, context_max_tokens):
 
+        super().__init__(mentions, left_side, right_side, label, id2label, label2id, vocab_size)
         self.label = label
         self.vocab_size = vocab_size
 
         self.id2label = id2label
         self.label2id = label2id
-        self.label_id = [[self.label2id[v] for v in k] for k in self.label]
+        self.label_id = [[self.get_label_from_id(v) for v in k] for k in self.label]
+        self.print_out_of_train_labels_number()
+
         self.mention_max_tokens = mention_max_tokens
         self.context_max_tokens = context_max_tokens
 
@@ -168,7 +171,7 @@ class ConcatenatedContextTypingBERTDataSet(TypingDataSet):
 
 
         t = time.time()
-        extracted_left_side = [' '.join(l.split(' ')[:- int(np.floor(self.context_max_tokens/2))]) for l in left_side]
+        extracted_left_side = [' '.join(l.split(' ')[- int(np.floor(self.context_max_tokens/2)):]) for l in left_side]
         extracted_right_side = [' '.join(r.split(' ')[: int(np.floor(self.context_max_tokens/2))]) for r in right_side]
 
         contexts = [l + ' ' + r for l, r in zip(extracted_left_side, extracted_right_side)]

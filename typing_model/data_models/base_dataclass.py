@@ -42,6 +42,8 @@ class BaseDataclass:
     max_mention_size : int = None
     max_context_size : int = None
 
+    experiment_name : str = None
+
     def __post_init__(self):
         self.early_stopping = bool(self.early_stopping)
         self.early_stopping_patience = int(self.early_stopping_patience)

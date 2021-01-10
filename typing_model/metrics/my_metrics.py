@@ -28,11 +28,11 @@ class MyMetrics(Metric):
 
         avg_pred_number, void_predictions, p, r, f1, ma_p, ma_r, ma_f1 = self.compute_metrics(pred_classes=self.pred_classes,	
                                                                                                 true_classes=self.true_classes)
-        
+        predicted_class_number = len(set([c for sub in self.pred_classes for c in sub ]))        
         self.pred_classes = []
         self.true_classes = []
 
-        return avg_pred_number, void_predictions, p, r, f1, ma_p, ma_r, ma_f1
+        return avg_pred_number, void_predictions, p, r, f1, ma_p, ma_r, ma_f1, predicted_class_number
 
     def logits_and_one_hot_labels_to_string(self, logits, one_hot_labels, no_void = False, threshold = 0.5):	
 

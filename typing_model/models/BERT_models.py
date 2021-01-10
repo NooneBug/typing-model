@@ -27,7 +27,7 @@ class BaseBERTTyper(BaseTyper):
 
 class ConcatenatedContextBERTTyper(BaseTyper):
 
-    def __init__(self, classes, id2label, label2id, max_mention_size=9, max_context_size=40, name = 'BertTyper', weights = None):
+    def __init__(self, classes, id2label, label2id, max_mention_size=9, max_context_size=16, name = 'BertTyper', weights = None):
 
         super().__init__(classes, id2label, label2id, name, weights)
 

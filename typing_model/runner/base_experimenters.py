@@ -5,6 +5,8 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
+from pytorch_lightning.loggers import TensorBoardLogger
+
 from typing_model.data.utils import DatasetParser
 from torch.utils.data import DataLoader
 
@@ -87,14 +89,23 @@ class BaseTypingExperimentClass(BaseExperimentClass):
 		self.max_mention_size = dataclass.max_mention_size
 		self.max_context_size = dataclass.max_context_size
 
+		self.experiment_name = dataclass.experiment_name
+
 	def setup(self):
-		self.dataloader_train, self.id2label, self.label2id, self.vocab_len = self.get_dataloader_from_dataset_path(self.train_data_path, 
-																								shuffle=True, train = True,
+
+		path_dict = {'train': self.train_data_path,
+					'dev': self.eval_data_path}
+
+		
+
+		self.dataloader_train, self.id2label, self.label2id, self.vocab_len = self.get_dataloader_from_dataset_path(
+																								path_dict, 
+																								shuffle=True, train_or_dev = 'train',
 																								batch_size = self.train_batch_size,
 																								load_path=self.load_train_dataset_path,
 																								save_path=self.save_train_dataset_path)
 
-		self.dataloader_val = self.get_dataloader_from_dataset_path(self.eval_data_path,
+		self.dataloader_val = self.get_dataloader_from_dataset_path(path_dict, train_or_dev = 'dev',
 																id2label=self.id2label, label2id=self.label2id, 
 																vocab_len=self.vocab_len,
 																batch_size = self.eval_batch_size,
@@ -144,17 +155,36 @@ class BaseTypingExperimentClass(BaseExperimentClass):
 												filename=self.checkpoint_name,
 												mode=self.checkpoint_mode)
 		callbacks.append(checkpoint_callback)
-		self.trainer = Trainer(callbacks=callbacks)
+
+		logger = TensorBoardLogger('lightning_logs', name=self.experiment_name)
+
+		self.trainer = Trainer(callbacks=callbacks, logger = logger)
 
 	def perform_experiment(self):
 		self.trainer.fit(self.bt, self.dataloader_train, self.dataloader_val)
 
-	def get_dataloader_from_dataset_path(self, dataset_path, batch_size = 500, shuffle = False, train = False, load_path = None,
+	def get_dataloaders_from_dataset_path(self, dataset_paths, batch_size = 500, load_paths = None):
+		
+		pt = DatasetParser(dataset_paths)
+		if not load_paths:
+			self.id2label, self.label2id, self.vocab_len = pt.collect_global_config()
+		elif load_paths:
+			with open(self.auxiliary_variables_path, 'rb') as filino:
+				self.id2label, self.label2id, self.vocab_len = pickle.load(filino)
+		else:
+			raise Exception('Please provide a right path to load auxiliary variables')
+
+		self.mention, self.left_side, self.right_side, self.label = pt.parse_dataset(train_or_dev='train')
+
+		
+	
+
+	def get_dataloader_from_dataset_path(self, dataset_paths, train_or_dev = None, batch_size = 500, shuffle = False, load_path = None,
 												save_path = None, id2label = None, label2id = None, vocab_len = None):
 		
-		pt = DatasetParser(dataset_path)
+		pt = DatasetParser(dataset_paths)
 
-		if train and not load_path:
+		if train_or_dev and not load_path:
 			self.id2label, self.label2id, self.vocab_len = pt.collect_global_config()
 		elif load_path:
 			with open(self.auxiliary_variables_path, 'rb') as filino:
@@ -164,7 +194,10 @@ class BaseTypingExperimentClass(BaseExperimentClass):
 		
 		#Create Dataloader or load it
 		if not load_path:
-			self.mention, self.left_side, self.right_side, self.label = pt.parse_dataset()
+			if train_or_dev:
+				self.mention, self.left_side, self.right_side, self.label = pt.parse_dataset(train_or_dev=train_or_dev)
+			else:
+				self.mention, self.left_side, self.right_side, self.label = pt.parse_dataset(train_or_dev=train_or_dev)
 
 			dataset = self.instance_dataset()
 			dataloader = DataLoader(dataset, batch_size=batch_size, shuffle = shuffle, num_workers=10)
@@ -178,7 +211,7 @@ class BaseTypingExperimentClass(BaseExperimentClass):
 			with open(save_path, "wb") as filino:
 				pickle.dump(dataloader, filino)
 
-		if not train:
+		if not train_or_dev == 'train':
 			return dataloader
 		else:
 			return dataloader, self.id2label, self.label2id, self.vocab_len

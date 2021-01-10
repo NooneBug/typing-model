@@ -49,12 +49,12 @@ class BertOnlyMentionExperiment(BaseTypingExperimentClass):
 		self.network_class = OnlyMentionBERTTyper
 		self.mention_max_length = dataclass.max_mention_size
 
-	def get_dataloader_from_dataset_path(self, dataset_path, batch_size = 500, shuffle = False, train = False, load_path = None,
+	def get_dataloader_from_dataset_path(self, dataset_path, batch_size = 500, shuffle = False, train_or_dev = None, load_path = None,
 												save_path = None, id2label = None, label2id = None, vocab_len = None):
 		
 		pt = DatasetParser(dataset_path)
 
-		if train and not load_path:
+		if train_or_dev and not load_path:
 			id2label, label2id, vocab_len = pt.collect_global_config()
 		elif load_path:
 			with open(self.auxiliary_variables_path, 'rb') as filino:
@@ -78,7 +78,7 @@ class BertOnlyMentionExperiment(BaseTypingExperimentClass):
 			with open(save_path, "wb") as filino:
 				pickle.dump(dataloader, filino)
 
-		if not train:
+		if not train_or_dev == 'train':
 			return dataloader
 		else:
 			return dataloader, id2label, label2id, vocab_len
