@@ -34,19 +34,30 @@ class ConcatenatedContextBERTTyper(BaseTyper):
         self.context_pooler = nn.AvgPool2d((max_context_size, 1))
         encoder_layer = nn.TransformerEncoderLayer(d_model=768, nhead=8)
         self.context_transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=1)
+        self.context_to_hidden = nn.Linear(768, 200)
 
         self.mention_pooler = nn.AvgPool2d((max_mention_size, 1))
         self.mention_to_hidden = nn.Linear(768, 200)
-        self.context_to_hidden = nn.Linear(768, 200)
+
         self.hidden_to_output = nn.Linear(400, classes)
 
         self.droppy = nn.Dropout(0.2)
         self.relu = nn.ReLU()
 
-        
         self.bert = BertModel.from_pretrained("bert-base-uncased")
         for param in self.bert.parameters():
             param.requires_grad = False
+
+    def fine_tuning_setup(self, new_class_number):
+        for param in self.mention_to_hidden.parameters():
+            param.requires_grad = False
+        for param in self.context_transformer_encoder.parameters():
+            param.requires_grad = False
+        for param in self.context_to_hidden.parameters():
+            param.requires_grad = False
+
+        print('substituting the final layer with a layer with {} classes'.format(new_class_number))
+        self.hidden_to_output = nn.Linear(400, new_class_number)
 
     def forward(self, mention, context):
 

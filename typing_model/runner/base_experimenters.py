@@ -91,6 +91,11 @@ class BaseTypingExperimentClass(BaseExperimentClass):
 
 		self.experiment_name = dataclass.experiment_name
 
+		self.load_pretrained = dataclass.load_pretrained
+		self.pretrained_class_number = dataclass.pretrained_class_number
+		self.state_dict_path = dataclass.state_dict_path
+		self.fine_tuning = dataclass.fine_tuning
+
 	def setup(self):
 
 		path_dict = {'train': self.train_data_path,
@@ -129,9 +134,23 @@ class BaseTypingExperimentClass(BaseExperimentClass):
 		self.declare_trainer_and_callbacks()
 
 	def instance_model(self):
-		self.bt = self.network_class(self.vocab_len, self.id2label, self.label2id, weights=self.ordered_weights, 
-										max_mention_size = self.max_mention_size, max_context_size = self.max_context_size).cuda()
+		if self.load_pretrained:
+			self.bt = self.network_class(self.pretrained_class_number, self.id2label, self.label2id, weights=self.ordered_weights, 
+											max_mention_size = self.max_mention_size, max_context_size = self.max_context_size).cuda()
+			self.load_state_dict(self.state_dict_path)
+		else:
+			self.bt = self.network_class(self.vocab_len, self.id2label, self.label2id, weights=self.ordered_weights, 
+											max_mention_size = self.max_mention_size, max_context_size = self.max_context_size).cuda()
+		if self.fine_tuning:
+			self.bt.fine_tuning_setup(self.vocab_len)
 	
+	def load_state_dict(self, state_dict_path):
+		self.bt.load_from_checkpoint(state_dict_path, 
+										classes = self.pretrained_class_number, 
+										id2label = self.id2label, 
+										label2id = self.label2id, 
+										weights = self.ordered_weights)
+
 	def instance_dataset(self):
 		return self.dataset_class(self.mention, self.left_side, self.right_side, self.label, self.id2label, 
 									self.label2id, self.vocab_len, self.max_mention_size, self.max_context_size)
@@ -158,25 +177,10 @@ class BaseTypingExperimentClass(BaseExperimentClass):
 
 		logger = TensorBoardLogger('lightning_logs', name=self.experiment_name)
 
-		self.trainer = Trainer(callbacks=callbacks, logger = logger)
+		self.trainer = Trainer(callbacks=callbacks, logger = logger, gpus = 1, max_epochs=self.epochs)
 
 	def perform_experiment(self):
 		self.trainer.fit(self.bt, self.dataloader_train, self.dataloader_val)
-
-	def get_dataloaders_from_dataset_path(self, dataset_paths, batch_size = 500, load_paths = None):
-		
-		pt = DatasetParser(dataset_paths)
-		if not load_paths:
-			self.id2label, self.label2id, self.vocab_len = pt.collect_global_config()
-		elif load_paths:
-			with open(self.auxiliary_variables_path, 'rb') as filino:
-				self.id2label, self.label2id, self.vocab_len = pickle.load(filino)
-		else:
-			raise Exception('Please provide a right path to load auxiliary variables')
-
-		self.mention, self.left_side, self.right_side, self.label = pt.parse_dataset(train_or_dev='train')
-
-		
 	
 
 	def get_dataloader_from_dataset_path(self, dataset_paths, train_or_dev = None, batch_size = 500, shuffle = False, load_path = None,

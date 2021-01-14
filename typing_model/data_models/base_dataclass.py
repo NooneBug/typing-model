@@ -44,6 +44,11 @@ class BaseDataclass:
 
     experiment_name : str = None
 
+    load_pretrained : bool = False
+    pretrained_class_number : int = None
+    state_dict_path : str = None
+    fine_tuning : bool = False
+
     def __post_init__(self):
         self.early_stopping = bool(self.early_stopping)
         self.early_stopping_patience = int(self.early_stopping_patience)
@@ -56,6 +61,10 @@ class BaseDataclass:
             self.max_context_size = int(self.max_context_size)
         self.train_batch_size = int(self.train_batch_size)
         self.eval_batch_size = int(self.eval_batch_size)
+        self.load_pretrained = bool(self.load_pretrained)
+        self.fine_tuning = bool(self.fine_tuning)
+        if self.pretrained_class_number:
+            self.pretrained_class_number = int(self.pretrained_class_number)
 
 @dataclass
 class ElmoDataclass(BaseDataclass):
