@@ -10,6 +10,8 @@ class BaseDataclass:
     early_stopping : bool
     early_stopping_patience : int
     epochs : int
+    min_epochs : int
+    lr : float
 
     checkpoint_monitor : str
     checkpoint_folder_path : str
@@ -44,6 +46,7 @@ class BaseDataclass:
 
     experiment_name : str = None
 
+    bert_fine_tuning : bool = False
     load_pretrained : bool = False
     pretrained_class_number : int = None
     state_dict_path : str = None
@@ -53,6 +56,8 @@ class BaseDataclass:
         self.early_stopping = bool(self.early_stopping)
         self.early_stopping_patience = int(self.early_stopping_patience)
         self.epochs = int(self.epochs)
+        self.min_epochs = int(self.min_epochs)
+        self.lr = float(self.lr)
         self.save_auxiliary_variables = bool(self.save_auxiliary_variables)
         self.weighted = bool(self.weighted)
         if self.max_mention_size:
@@ -65,6 +70,7 @@ class BaseDataclass:
         self.fine_tuning = bool(self.fine_tuning)
         if self.pretrained_class_number:
             self.pretrained_class_number = int(self.pretrained_class_number)
+        self.bert_fine_tuning = bool(self.bert_fine_tuning)
 
 @dataclass
 class ElmoDataclass(BaseDataclass):

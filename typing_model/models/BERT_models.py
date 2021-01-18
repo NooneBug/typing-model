@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+from torch.nn.modules.linear import Linear
 from torch.nn.modules.loss import BCEWithLogitsLoss
 from transformers import BertModel
 from typing_model.losses.hierarchical_losses import HierarchicalLoss, HierarchicalRegularization
@@ -25,12 +26,33 @@ class BaseBERTTyper(BaseTyper):
 
         return outputs
 
+class BertEncoder(nn.Module):
+
+    def __init__(self, bert_fine_tuning):
+        super().__init__()
+        self.bert = BertModel.from_pretrained("bert-base-uncased")
+        if bert_fine_tuning:
+            for name, param in self.bert.named_parameters():
+                if '11' not in name:
+                    param.requires_grad = False
+        else:
+            for _, param in self.bert.named_parameters():
+                param.requires_grad = False
+    
+    def forward(self, input, mention_or_context):
+        b_encoding = self.bert(input).last_hidden_state
+
+        return b_encoding
+
+
 class ConcatenatedContextBERTTyper(BaseTyper):
 
-    def __init__(self, classes, id2label, label2id, max_mention_size=9, max_context_size=16, name = 'BertTyper', weights = None):
+    def __init__(self, classes, id2label, label2id, max_mention_size=9, max_context_size=16, name = 'BertTyper', 
+                    weights = None, lr = None, bert_fine_tuning = None):
 
-        super().__init__(classes, id2label, label2id, name, weights)
+        super().__init__(classes, id2label, label2id, name, weights, lr)
 
+        self.input_encoder = BertEncoder(bert_fine_tuning)
         self.context_pooler = nn.AvgPool2d((max_context_size, 1))
         encoder_layer = nn.TransformerEncoderLayer(d_model=768, nhead=8)
         self.context_transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=1)
@@ -39,42 +61,35 @@ class ConcatenatedContextBERTTyper(BaseTyper):
         self.mention_pooler = nn.AvgPool2d((max_mention_size, 1))
         self.mention_to_hidden = nn.Linear(768, 200)
 
+        self.hidden_to_hidden = Linear(400, 400).cuda()
         self.hidden_to_output = nn.Linear(400, classes)
 
         self.droppy = nn.Dropout(0.2)
         self.relu = nn.ReLU()
 
-        self.bert = BertModel.from_pretrained("bert-base-uncased")
-        for param in self.bert.parameters():
-            param.requires_grad = False
-
     def fine_tuning_setup(self, new_class_number):
-        for param in self.mention_to_hidden.parameters():
-            param.requires_grad = False
-        for param in self.context_transformer_encoder.parameters():
-            param.requires_grad = False
-        for param in self.context_to_hidden.parameters():
+        for param in self.input_encoder.bert.parameters():
             param.requires_grad = False
 
         print('substituting the final layer with a layer with {} classes'.format(new_class_number))
         self.hidden_to_output = nn.Linear(400, new_class_number)
 
     def forward(self, mention, context):
-
         mention = mention.cuda()
         context = context.cuda()
 
-        encoded_mention = self.bert(mention).last_hidden_state
+        encoded_mention = self.input_encoder(mention, 'mention')
         pooled_mention = self.mention_pooler(encoded_mention).squeeze()
         h1 = self.droppy(self.relu(self.mention_to_hidden(pooled_mention)))
 
-        encoded_context = self.bert(context).last_hidden_state
+        encoded_context = self.input_encoder(context, 'context')
         te_2 = self.context_transformer_encoder(encoded_context)
         pooled_context = self.context_pooler(te_2).squeeze()
         h2 = self.droppy(self.relu(self.context_to_hidden(pooled_context)))
 
         concat = torch.cat([h1, h2], dim=1)
-        outputs = self.hidden_to_output(concat)
+        h = self.droppy(self.relu(self.hidden_to_hidden(concat)))
+        outputs = self.hidden_to_output(h)
 
         return outputs
 

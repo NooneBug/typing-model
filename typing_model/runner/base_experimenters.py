@@ -63,6 +63,8 @@ class BaseTypingExperimentClass(BaseExperimentClass):
 		self.early_stopping_metric = dataclass.early_stopping_metric
 		self.early_stopping_mode = dataclass.early_stopping_mode
 		self.epochs = dataclass.epochs
+		self.min_epochs = dataclass.min_epochs
+		self.learning_rate = dataclass.lr
 
 		self.load_train_dataset_path = dataclass.load_train_dataset_path
 		self.load_eval_dataset_path = dataclass.load_eval_dataset_path
@@ -95,6 +97,7 @@ class BaseTypingExperimentClass(BaseExperimentClass):
 		self.pretrained_class_number = dataclass.pretrained_class_number
 		self.state_dict_path = dataclass.state_dict_path
 		self.fine_tuning = dataclass.fine_tuning
+		self.bert_fine_tuning = dataclass.bert_fine_tuning
 
 	def setup(self):
 
@@ -135,12 +138,16 @@ class BaseTypingExperimentClass(BaseExperimentClass):
 
 	def instance_model(self):
 		if self.load_pretrained:
-			self.bt = self.network_class(self.pretrained_class_number, self.id2label, self.label2id, weights=self.ordered_weights, 
-											max_mention_size = self.max_mention_size, max_context_size = self.max_context_size).cuda()
-			self.load_state_dict(self.state_dict_path)
+			class_number = self.pretrained_class_number
 		else:
-			self.bt = self.network_class(self.vocab_len, self.id2label, self.label2id, weights=self.ordered_weights, 
-											max_mention_size = self.max_mention_size, max_context_size = self.max_context_size).cuda()
+			class_number = self.vocab_len
+		
+		self.bt = self.network_class(class_number, self.id2label, self.label2id, weights=self.ordered_weights, 
+										max_mention_size = self.max_mention_size, max_context_size = self.max_context_size,
+										lr = self.learning_rate, bert_fine_tuning = self.bert_fine_tuning).cuda()
+		if self.load_pretrained:
+			self.load_state_dict(self.state_dict_path)
+
 		if self.fine_tuning:
 			self.bt.fine_tuning_setup(self.vocab_len)
 	
@@ -177,7 +184,8 @@ class BaseTypingExperimentClass(BaseExperimentClass):
 
 		logger = TensorBoardLogger('lightning_logs', name=self.experiment_name)
 
-		self.trainer = Trainer(callbacks=callbacks, logger = logger, gpus = 1, max_epochs=self.epochs)
+		self.trainer = Trainer(callbacks=callbacks, logger = logger, gpus = 1, 
+								max_epochs=self.epochs, min_epochs = self.min_epochs)
 
 	def perform_experiment(self):
 		self.trainer.fit(self.bt, self.dataloader_train, self.dataloader_val)
