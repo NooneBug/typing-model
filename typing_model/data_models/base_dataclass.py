@@ -7,17 +7,18 @@ class BaseDataclass:
     eval_data_path : str 
     test_data_path : str 
     
-    early_stopping : bool
-    early_stopping_patience : int
     epochs : int
     min_epochs : int
     lr : float
+
 
     checkpoint_monitor : str
     checkpoint_folder_path : str
     checkpoint_name : str
     checkpoint_mode : str
     
+    early_stopping : bool = ''
+    early_stopping_patience : int = 0
     early_stopping_metric : str = 'val_loss'
     early_stopping_mode : str = 'min'
     save_train_dataset_path : str = None

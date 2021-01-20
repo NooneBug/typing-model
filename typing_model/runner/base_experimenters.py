@@ -152,11 +152,12 @@ class BaseTypingExperimentClass(BaseExperimentClass):
 			self.bt.fine_tuning_setup(self.vocab_len)
 	
 	def load_state_dict(self, state_dict_path):
-		self.bt.load_from_checkpoint(state_dict_path, 
+		self.bt = self.bt.load_from_checkpoint(state_dict_path, 
 										classes = self.pretrained_class_number, 
 										id2label = self.id2label, 
 										label2id = self.label2id, 
-										weights = self.ordered_weights)
+										weights = self.ordered_weights, 
+										lr = self.learning_rate)
 
 	def instance_dataset(self):
 		return self.dataset_class(self.mention, self.left_side, self.right_side, self.label, self.id2label, 
