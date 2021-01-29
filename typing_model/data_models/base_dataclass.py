@@ -2,25 +2,11 @@ from dataclasses import dataclass
 from torch.utils import data
 
 @dataclass
-class BaseDataclass:
-    train_data_path : str 
-    eval_data_path : str 
-    test_data_path : str 
-    
-    epochs : int
-    min_epochs : int
-    lr : float
+class DataloaderDataclass:
+    train_data_path : str = ''
+    eval_data_path : str = ''
+    test_data_path : str = ''
 
-
-    checkpoint_monitor : str
-    checkpoint_folder_path : str
-    checkpoint_name : str
-    checkpoint_mode : str
-    
-    early_stopping : bool = ''
-    early_stopping_patience : int = 0
-    early_stopping_metric : str = 'val_loss'
-    early_stopping_mode : str = 'min'
     save_train_dataset_path : str = None
     save_eval_dataset_path : str = None
     save_test_dataset_path : str = None
@@ -32,6 +18,29 @@ class BaseDataclass:
     save_auxiliary_variables : bool = False
     aux_save_path : str = None
     auxiliary_variables_path : str = None
+
+    def __post_init__(self):
+        self.save_auxiliary_variables = bool(self.save_auxiliary_variables)
+
+
+
+@dataclass
+class BaseDataclass(DataloaderDataclass):
+    
+    lr : float = 1e-3
+    loss_multiplier : int = 1
+
+    checkpoint_monitor : str = ''
+    checkpoint_folder_path : str = ''
+    checkpoint_name : str = ''
+    checkpoint_mode : str = ''
+    
+    epochs : int = 1000
+    min_epochs : int = 1
+    early_stopping : bool = ''
+    early_stopping_patience : int = 0
+    early_stopping_metric : str = 'val_loss'
+    early_stopping_mode : str = 'min'
 
     weighted : bool = False
     weights_path : str = None
@@ -59,7 +68,6 @@ class BaseDataclass:
         self.epochs = int(self.epochs)
         self.min_epochs = int(self.min_epochs)
         self.lr = float(self.lr)
-        self.save_auxiliary_variables = bool(self.save_auxiliary_variables)
         self.weighted = bool(self.weighted)
         if self.max_mention_size:
             self.max_mention_size = int(self.max_mention_size)
@@ -72,6 +80,7 @@ class BaseDataclass:
         if self.pretrained_class_number:
             self.pretrained_class_number = int(self.pretrained_class_number)
         self.bert_fine_tuning = bool(self.bert_fine_tuning)
+        self.loss_multiplier = float(self.loss_multiplier)
 
 @dataclass
 class ElmoDataclass(BaseDataclass):

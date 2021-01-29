@@ -3,6 +3,7 @@ from torch import nn
 from torch.nn.modules.linear import Linear
 from torch.nn.modules.loss import BCEWithLogitsLoss
 from transformers import BertModel
+from typing_model.data.BERT_datasets import ConcatenatedContextTypingBERTDataSet
 from typing_model.losses.hierarchical_losses import HierarchicalLoss, HierarchicalRegularization
 from typing_model.models.base_models import BaseTyper
 
@@ -48,9 +49,9 @@ class BertEncoder(nn.Module):
 class ConcatenatedContextBERTTyper(BaseTyper):
 
     def __init__(self, classes, id2label, label2id, max_mention_size=9, max_context_size=16, name = 'BertTyper', 
-                    weights = None, lr = None, bert_fine_tuning = None):
+                    weights = None, lr = None, bert_fine_tuning = None, loss_multiplier = 1):
 
-        super().__init__(classes, id2label, label2id, name, weights, lr)
+        super().__init__(classes, id2label, label2id, name, weights, lr, loss_multiplier)
 
         self.input_encoder = BertEncoder(bert_fine_tuning)
         self.context_pooler = nn.AvgPool2d((max_context_size, 1))
@@ -73,6 +74,7 @@ class ConcatenatedContextBERTTyper(BaseTyper):
 
         print('substituting the final layer with a layer with {} classes'.format(new_class_number))
         self.hidden_to_output = nn.Linear(400, new_class_number)
+
 
     def forward(self, mention, context):
         mention = mention.cuda()
@@ -120,6 +122,39 @@ class ConcatenatedContextBERTTyper(BaseTyper):
         self.update_metrics(pred=model_output, labels=labels)
 
         return val_loss
+
+class Bertv2(ConcatenatedContextBERTTyper):
+    def __init__(self, classes, id2label, label2id, max_mention_size=9, max_context_size=16, name = 'BertTyper', 
+                    weights = None, lr = None, bert_fine_tuning = None, loss_multiplier = 1):
+        
+        super().__init__(classes=classes, id2label=id2label, label2id=label2id, max_mention_size=max_mention_size, 
+                            max_context_size =max_context_size, name = name,  weights= weights, lr = lr, 
+                            bert_fine_tuning = bert_fine_tuning, loss_multiplier = loss_multiplier)
+
+        self.mention_batch_n = nn.BatchNorm1d(200)
+        self.context_batch_n = nn.BatchNorm1d(200)
+        self.cat_batch_n = nn.BatchNorm1d(400)
+        self.hidden_batch_n = nn.BatchNorm1d(400)
+
+    def forward(self, mention, context):
+        mention = mention.cuda()
+        context = context.cuda()
+
+        encoded_mention = self.input_encoder(mention, 'mention')
+        pooled_mention = self.mention_pooler(encoded_mention).squeeze()
+        h1 = self.droppy(self.mention_batch_n(self.relu(self.mention_to_hidden(pooled_mention))))
+
+        encoded_context = self.input_encoder(context, 'context')
+        te_2 = self.context_transformer_encoder(encoded_context)
+        pooled_context = self.context_pooler(te_2).squeeze()
+        h2 = self.droppy(self.context_batch_n(self.relu(self.context_to_hidden(pooled_context))))
+
+        concat = torch.cat([h1, h2], dim=1)
+        h = self.droppy(self.hidden_batch_n(self.relu(self.hidden_to_hidden(concat))))
+        outputs = self.hidden_to_output(h)
+
+        return outputs
+
 
 class TransformerWHierarchicalLoss(ConcatenatedContextBERTTyper):
 

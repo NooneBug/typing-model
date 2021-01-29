@@ -65,6 +65,7 @@ class BaseTypingExperimentClass(BaseExperimentClass):
 		self.epochs = dataclass.epochs
 		self.min_epochs = dataclass.min_epochs
 		self.learning_rate = dataclass.lr
+		self.loss_multiplier = dataclass.loss_multiplier
 
 		self.load_train_dataset_path = dataclass.load_train_dataset_path
 		self.load_eval_dataset_path = dataclass.load_eval_dataset_path
@@ -144,7 +145,8 @@ class BaseTypingExperimentClass(BaseExperimentClass):
 		
 		self.bt = self.network_class(class_number, self.id2label, self.label2id, weights=self.ordered_weights, 
 										max_mention_size = self.max_mention_size, max_context_size = self.max_context_size,
-										lr = self.learning_rate, bert_fine_tuning = self.bert_fine_tuning).cuda()
+										lr = self.learning_rate, bert_fine_tuning = self.bert_fine_tuning,
+										loss_multiplier = self.loss_multiplier).cuda()
 		if self.load_pretrained:
 			self.load_state_dict(self.state_dict_path)
 
@@ -157,7 +159,8 @@ class BaseTypingExperimentClass(BaseExperimentClass):
 										id2label = self.id2label, 
 										label2id = self.label2id, 
 										weights = self.ordered_weights, 
-										lr = self.learning_rate)
+										lr = self.learning_rate, 
+										loss_multiplier = self.loss_multiplier)
 
 	def instance_dataset(self):
 		return self.dataset_class(self.mention, self.left_side, self.right_side, self.label, self.id2label, 
@@ -193,17 +196,16 @@ class BaseTypingExperimentClass(BaseExperimentClass):
 	
 
 	def get_dataloader_from_dataset_path(self, dataset_paths, train_or_dev = None, batch_size = 500, shuffle = False, load_path = None,
+												load_variables = None,
 												save_path = None, id2label = None, label2id = None, vocab_len = None):
 		
 		pt = DatasetParser(dataset_paths)
 
-		if train_or_dev and not load_path:
+		if not load_variables:
 			self.id2label, self.label2id, self.vocab_len = pt.collect_global_config()
-		elif load_path:
+		elif load_variables:
 			with open(self.auxiliary_variables_path, 'rb') as filino:
 				self.id2label, self.label2id, self.vocab_len = pickle.load(filino)
-		elif not id2label or not label2id or not vocab_len:
-			raise Exception('Please provide id2label_dict, label2id_dict and vocab len to generate val_loader or test_loader')
 		
 		#Create Dataloader or load it
 		if not load_path:

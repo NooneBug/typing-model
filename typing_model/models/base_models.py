@@ -7,7 +7,7 @@ class BaseTyper(pl.LightningModule):
     """
     Base class for typing, defines the metrix and a few things we need to train the networks
     """
-    def __init__(self, classes, id2label, label2id, name = "BaseTyper", weights = None, lr=1e-3):
+    def __init__(self, classes, id2label, label2id, name = "BaseTyper", weights = None, lr=1e-3, loss_multiplier = 1):
         # TODO: some parameters are not used but are imported in the subclasses
         super().__init__()
 
@@ -19,6 +19,8 @@ class BaseTyper(pl.LightningModule):
 
         self.weights = weights
         self.classification_loss = nn.BCEWithLogitsLoss(pos_weight=self.weights)
+
+        self.loss_multiplier = loss_multiplier
 
         # Declaring evaluation Metrics
         self.micro_precision = pl.metrics.classification.precision_recall.Precision(num_classes=len(self.id2label),
@@ -76,7 +78,7 @@ class BaseTyper(pl.LightningModule):
         raise Exception("Declare a forward which takes in input the mention representation and its contexts")
 
     def compute_loss(self, pred, true):
-        return self.classification_loss(pred, true)
+        return self.classification_loss(pred, true) * self.loss_multiplier
     
     def get_discrete_pred(self, pred, threshold = 0.5):
         mask = pred > threshold

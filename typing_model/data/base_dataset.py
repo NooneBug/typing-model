@@ -12,7 +12,7 @@ class TypingDataSet(Dataset):
 
         self.id2label = id2label
         self.label2id = label2id
-        self.label_id = [[self.label2id[v] for v in k] for k in self.label]
+        self.label_id = [[self.label2id[v] if v in self.label2id else 0 for v in k] for k in self.label]
         self.labels_not_in_training_set = 0
 
     def __len__(self):
