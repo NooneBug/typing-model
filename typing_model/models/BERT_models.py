@@ -23,7 +23,7 @@ class BaseBERTTyper(BaseTyper):
         h3 = self.right_to_hidden(right)
         concat = torch.cat([h1, h2, h3], dim=1)
 
-        outputs = self.hidden_to_output(concat)
+        outputs = self.sig(self.hidden_to_output(concat))
 
         return outputs
 
@@ -48,10 +48,10 @@ class BertEncoder(nn.Module):
 
 class ConcatenatedContextBERTTyper(BaseTyper):
 
-    def __init__(self, classes, id2label, label2id, max_mention_size=9, max_context_size=16, name = 'BertTyper', 
-                    weights = None, lr = None, bert_fine_tuning = None, loss_multiplier = 1):
+    def __init__(self, classes, id2label, label2id, max_mention_size=9, max_context_size=16, 
+                    weights = None, lr = None, bert_fine_tuning = None, loss_multiplier = 1, positive_weight=1):
 
-        super().__init__(classes, id2label, label2id, name, weights, lr, loss_multiplier)
+        super().__init__(classes, id2label, label2id, weights, lr, loss_multiplier, positive_weight)
 
         self.input_encoder = BertEncoder(bert_fine_tuning)
         self.context_pooler = nn.AvgPool2d((max_context_size, 1))
@@ -91,7 +91,7 @@ class ConcatenatedContextBERTTyper(BaseTyper):
 
         concat = torch.cat([h1, h2], dim=1)
         h = self.droppy(self.relu(self.hidden_to_hidden(concat)))
-        outputs = self.hidden_to_output(h)
+        outputs = self.sig(self.hidden_to_output(h))
 
         return outputs
 
@@ -151,10 +151,9 @@ class Bertv2(ConcatenatedContextBERTTyper):
 
         concat = torch.cat([h1, h2], dim=1)
         h = self.droppy(self.hidden_batch_n(self.relu(self.hidden_to_hidden(concat))))
-        outputs = self.hidden_to_output(h)
+        outputs = self.sig(self.hidden_to_output(h))
 
         return outputs
-
 
 class TransformerWHierarchicalLoss(ConcatenatedContextBERTTyper):
 
@@ -216,7 +215,7 @@ class OnlyMentionBERTTyper(BaseTyper):
         pooled_mention = self.mention_pooler(encoded_mention).squeeze()
         h1 = self.droppy(self.relu(self.mention_to_hidden(pooled_mention)))
 
-        outputs = self.hidden_to_output(h1)
+        outputs = self.sig(self.hidden_to_output(h1))
 
         return outputs
 
@@ -280,7 +279,7 @@ class OnlyContextBERTTyper(BaseTyper):
         pooled_context = self.context_pooler(te_2).squeeze()
         h1 = self.droppy(self.relu(self.context_to_hidden(pooled_context)))
 
-        outputs = self.hidden_to_output(h1)
+        outputs = self.sig(self.hidden_to_output(h1))
 
         return outputs
 

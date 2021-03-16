@@ -1,5 +1,4 @@
 from typing_model.data.base_dataset import TypingDataSet 
-from sentence_transformers import SentenceTransformer
 from transformers import BertTokenizer
 import gc
 import torch
@@ -11,15 +10,6 @@ class TypingBERTDataSet(TypingDataSet):
 
     def __init__(self, mentions, left_side, right_side, label, id2label, label2id, vocab_size):
         super().__init__(mentions, left_side, right_side, label, id2label, label2id, vocab_size)
-        model = SentenceTransformer('bert-base-uncased')
-
-        self.mentions = model.encode(mentions, show_progress_bar=True, batch_size=100)
-        self.left_side = model.encode(left_side, show_progress_bar=True, batch_size=100)
-        self.right_side = model.encode(right_side, show_progress_bar=True, batch_size=100)
-
-        del model
-        torch.cuda.empty_cache()
-        gc.collect()
 
 class PaddedTypingBERTDataSet(TypingDataSet):
 

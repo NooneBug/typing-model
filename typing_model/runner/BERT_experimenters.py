@@ -20,7 +20,6 @@ class ConcatenatedContextBERTTyperExperiment(BaseTypingExperimentClass):
 		self.network_class = ConcatenatedContextBERTTyper
 
 class BertHierarchicalExperiment(BaseTypingExperimentClass):
-
 	def __init__(self, dataclass):
 		super().__init__(dataclass)
 		self.dataset_class = PaddedTypingBERTDataSet

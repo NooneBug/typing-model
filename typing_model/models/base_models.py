@@ -2,12 +2,13 @@ from typing_model.metrics.my_metrics import MyMetrics
 import pytorch_lightning as pl
 from torch import nn
 import torch
+from typing_model.losses.weighted_BCELoss import WeightedBCELoss
 
 class BaseTyper(pl.LightningModule):
     """
     Base class for typing, defines the metrix and a few things we need to train the networks
     """
-    def __init__(self, classes, id2label, label2id, name = "BaseTyper", weights = None, lr=1e-3, loss_multiplier = 1):
+    def __init__(self, classes, id2label, label2id, weights = None, lr=1e-3, loss_multiplier = 1, positive_weight = 1):
         # TODO: some parameters are not used but are imported in the subclasses
         super().__init__()
 
@@ -17,8 +18,23 @@ class BaseTyper(pl.LightningModule):
 
         self.sig = nn.Sigmoid()
 
-        self.weights = weights
-        self.classification_loss = nn.BCEWithLogitsLoss(pos_weight=self.weights)
+        # self.weights = weights
+        # self.classification_loss = nn.BCELoss()
+
+
+        if not torch.is_tensor(weights):
+            weights = torch.full((classes, ), 1.)
+        
+        if positive_weight > 0:
+            pos_weigths = torch.full((classes, ), float(positive_weight))
+            self.classification_loss = WeightedBCELoss(weight=weights, 
+                                                            pos_weight=pos_weigths)
+        elif positive_weight == -1:
+            pos_weights = torch.full((classes, ), 1.)
+            self.classification_loss = WeightedBCELoss(weight=weights, 
+                                                        pos_weight=pos_weights,
+                                                        PosWeightIsDynamic=True)
+            
 
         self.loss_multiplier = loss_multiplier
 
@@ -78,8 +94,16 @@ class BaseTyper(pl.LightningModule):
         raise Exception("Declare a forward which takes in input the mention representation and its contexts")
 
     def compute_loss(self, pred, true):
-        return self.classification_loss(pred, true) * self.loss_multiplier
+        return self.apply_loss_weights(self.loss_function(pred, true))
     
+    def loss_function(self, pred, true):
+        return self.classification_loss(pred, true)
+
+    def apply_loss_weights(self, loss):
+        loss = loss * self.loss_multiplier
+        return loss
+          
+
     def get_discrete_pred(self, pred, threshold = 0.5):
         mask = pred > threshold
 

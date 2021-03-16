@@ -40,7 +40,7 @@ class ElmoTyper(BaseTyper):
 
         hidden = torch.cat((h1, h2), dim = 1)
 
-        output = self.hidden_to_class(hidden)
+        output = self.sig(self.hidden_to_class(hidden))
 
         return output
 

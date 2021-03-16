@@ -6,6 +6,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.loggers import TensorBoardLogger
+from typing_model.callbacks.TelegramCallback import TelegramCallback
 
 from typing_model.data.utils import DatasetParser
 from torch.utils.data import DataLoader
@@ -79,12 +80,16 @@ class BaseTypingExperimentClass(BaseExperimentClass):
 		self.checkpoint_folder_path = dataclass.checkpoint_folder_path
 		self.checkpoint_name = dataclass.checkpoint_name
 		self.checkpoint_mode = dataclass.checkpoint_mode
+		self.checkpoint_every_epoch = dataclass.checkpoint_every_epoch
+		self.telegram_callback = dataclass.telegram_callback
+
 		self.save_auxiliary_variables = dataclass.save_auxiliary_variables
 		self.aux_save_path = dataclass.aux_save_path
 		self.auxiliary_variables_path = dataclass.auxiliary_variables_path
 
 		self.weighted = dataclass.weighted
 		self.weights_path = dataclass.weights_path
+		self.positive_weight = dataclass.positive_weight
 
 		self.train_batch_size = dataclass.train_batch_size
 		self.eval_batch_size = dataclass.eval_batch_size
@@ -146,7 +151,7 @@ class BaseTypingExperimentClass(BaseExperimentClass):
 		self.bt = self.network_class(class_number, self.id2label, self.label2id, weights=self.ordered_weights, 
 										max_mention_size = self.max_mention_size, max_context_size = self.max_context_size,
 										lr = self.learning_rate, bert_fine_tuning = self.bert_fine_tuning,
-										loss_multiplier = self.loss_multiplier).cuda()
+										loss_multiplier = self.loss_multiplier, positive_weight=self.positive_weight).cuda()
 		if self.load_pretrained:
 			self.load_state_dict(self.state_dict_path)
 
@@ -180,16 +185,27 @@ class BaseTypingExperimentClass(BaseExperimentClass):
 			)
 			callbacks.append(early_stop_callback)
 		
+		if self.telegram_callback:
+			telegram_callback = TelegramCallback()
+			callbacks.append(telegram_callback)
+
 		checkpoint_callback = ModelCheckpoint(monitor=self.checkpoint_monitor,
 												dirpath=self.checkpoint_folder_path,
 												filename=self.checkpoint_name,
-												mode=self.checkpoint_mode)
+												mode=self.checkpoint_mode,
+												save_last=False)
 		callbacks.append(checkpoint_callback)
 
-		logger = TensorBoardLogger('lightning_logs', name=self.experiment_name)
+		if self.checkpoint_every_epoch:
+			checkpoint_ee = ModelCheckpoint(dirpath=self.checkpoint_folder_path + 'epochs_ckpts/',
+											filename='model_{epoch}', save_top_k=-1, period=1)
+			callbacks.append(checkpoint_ee)
+
+		logger = TensorBoardLogger('lightning_logs', name=self.experiment_name, default_hp_metric=False)
 
 		self.trainer = Trainer(callbacks=callbacks, logger = logger, gpus = 1, 
 								max_epochs=self.epochs, min_epochs = self.min_epochs)
+		
 
 	def perform_experiment(self):
 		self.trainer.fit(self.bt, self.dataloader_train, self.dataloader_val)

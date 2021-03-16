@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from torch.utils import data
+from typing_model.callbacks.TelegramCallback import TelegramCallback
 
 @dataclass
 class DataloaderDataclass:
@@ -34,6 +35,8 @@ class BaseDataclass(DataloaderDataclass):
     checkpoint_folder_path : str = ''
     checkpoint_name : str = ''
     checkpoint_mode : str = ''
+
+    checkpoint_every_epoch : str = ''
     
     epochs : int = 1000
     min_epochs : int = 1
@@ -44,6 +47,7 @@ class BaseDataclass(DataloaderDataclass):
 
     weighted : bool = False
     weights_path : str = None
+    positive_weight : int = 1 # weight to be applied on loss of predictions which have to be positive 
 
     hierarchical_mode : str = None
     label_dependency_path : str = None
@@ -61,6 +65,8 @@ class BaseDataclass(DataloaderDataclass):
     pretrained_class_number : int = None
     state_dict_path : str = None
     fine_tuning : bool = False
+
+    telegram_callback : bool = False
 
     def __post_init__(self):
         self.early_stopping = bool(self.early_stopping)
@@ -81,6 +87,28 @@ class BaseDataclass(DataloaderDataclass):
             self.pretrained_class_number = int(self.pretrained_class_number)
         self.bert_fine_tuning = bool(self.bert_fine_tuning)
         self.loss_multiplier = float(self.loss_multiplier)
+        self.checkpoint_every_epoch = bool(self.checkpoint_every_epoch)
+        self.positive_weight = int(self.positive_weight)
+        self.telegram_callback = bool(self.telegram_callback)
+
+@dataclass
+class JointSpaceDataclass(BaseDataclass):
+    joint_space_dim : int = 100
+    trainable_threshold : bool = False
+    random_threshold : bool = False
+    threshold_value : float = .5
+    inject_inference_in_model : bool = False
+    label_init_path : str = ''
+    regularization : bool = False
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.joint_space_dim = int(self.joint_space_dim)
+        self.trainable_threshold = bool(self.trainable_threshold)
+        self.random_threshold = bool(self.random_threshold)
+        self.threshold_value = float(self.threshold_value)
+        self.inject_inference_in_model = bool(self.inject_inference_in_model)
+        self.regularization = bool(self.regularization)
 
 @dataclass
 class ElmoDataclass(BaseDataclass):
